@@ -1,7 +1,10 @@
 use std::{env, process::Command};
 
 fn main() {
-    for file in std::fs::read_dir("../dpedal_firmware").unwrap() {
+    for file in std::fs::read_dir("../dpedal_firmware")
+        .unwrap()
+        .chain(std::fs::read_dir("../dpedal_config").unwrap())
+    {
         let path = file.unwrap().path();
 
         if path.file_name().unwrap().to_str().unwrap() != "target" {
