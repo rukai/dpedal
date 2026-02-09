@@ -4,12 +4,12 @@ pub mod web_config_protocol;
 
 // Memory layout
 pub const RP2040_FLASH_OFFSET: usize = 0x10000000;
-pub const RP2040_FLASH_SIZE: usize = 1024 * 1024 * 16; // 16 MiB
+pub const PICO_FLASH_SIZE: usize = 1024 * 1024 * 2; // 2 MiB
 
 pub const FIRMWARE_OFFSET: usize = 0;
-pub const FIRMWARE_SIZE: usize = 1024 * 1024 * 15; // 15 MiB
-pub const CONFIG_OFFSET: usize = 1024 * 1024 * 15;
-pub const CONFIG_SIZE: usize = 1024 * 16; // 10 KiB
+pub const FIRMWARE_SIZE: usize = 1024 * 2000; // 2000 KiB
+pub const CONFIG_OFFSET: usize = 1024 * 2000;
+pub const CONFIG_SIZE: usize = 1024 * 16; // 16 KiB // TODO: give more space to config, currently increasing this causes problems, see dpedal_firmware/src/config.rs
 
 use arrayvec::{ArrayString, ArrayVec};
 use defmt::Format;
@@ -24,6 +24,7 @@ const fn assert_config_fits_in_flash() {
 
 const fn assert_config_size_fits_into_writable_flash_blocks() {
     // Flash can only be written in blocks of 4096 bytes.
+    assert!(CONFIG_OFFSET.is_multiple_of(4096));
     assert!(CONFIG_SIZE.is_multiple_of(4096));
 }
 

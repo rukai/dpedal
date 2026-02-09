@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 use defmt::error;
-use dpedal_config::{ArchivedConfig, CONFIG_OFFSET, CONFIG_SIZE, Config, RP2040_FLASH_SIZE};
+use dpedal_config::{ArchivedConfig, CONFIG_OFFSET, CONFIG_SIZE, Config, PICO_FLASH_SIZE};
 use embassy_rp::{
     Peri,
     flash::{Blocking, Flash},
@@ -12,7 +12,7 @@ use rkyv::{rancor::Failure, util::Align};
 pub static CONFIG: Mutex<CriticalSectionRawMutex, Option<Config>> = Mutex::new(None);
 
 pub struct ConfigFlash {
-    flash: Flash<'static, FLASH, Blocking, RP2040_FLASH_SIZE>,
+    flash: Flash<'static, FLASH, Blocking, PICO_FLASH_SIZE>,
 }
 
 impl ConfigFlash {
