@@ -135,7 +135,7 @@ impl WebConfig {
     async fn send_response(&mut self, response: Response) {
         let mut response_buf = [0; 1024];
         let response = postcard::to_slice_cobs(&response, &mut response_buf).unwrap();
-        info!("responsed with message containing {} bytes", response.len());
+        info!("responded with message containing {} bytes", response.len());
         for chunk in response.chunks(64) {
             if !chunk.is_empty() {
                 self.write_ep.write(chunk).await.unwrap();
