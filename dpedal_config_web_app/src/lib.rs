@@ -103,7 +103,7 @@ async fn open_device() {
 
     let color = document.get_element_by_id("device_color").unwrap();
     let color = color.dyn_ref::<HtmlInputElement>().unwrap();
-    color.set_value(&format!("#{:x}", config.color));
+    color.set_value(&format!("#{:0>6x}", config.color));
 
     if let Some(profile) = config.profiles.first() {
         gen_for_profile(&document, profile);
