@@ -1,4 +1,5 @@
 use defmt::*;
+use dpedal_config::CONFIG_SIZE;
 use dpedal_config::web_config_protocol::{Request, Response};
 use embassy_rp::usb::{Endpoint, In, Out};
 use embassy_rp::{peripherals::USB, usb::Driver};
@@ -20,6 +21,7 @@ pub struct WebConfig {
     write_ep: Endpoint<'static, USB, In>,
     read_ep: Endpoint<'static, USB, Out>,
     config_flash: ConfigFlash,
+    cobs_buf: &'static mut CobsAccumulator<CONFIG_SIZE>,
 }
 
 //pub static CONFIG_CHANNEL: Channel<ThreadModeRawMutex, (), 64> = Channel::new();
@@ -33,9 +35,8 @@ impl WebConfig {
         let webusb_config = WEBUSB_CONFIG.init(WebUsbConfig {
             max_packet_size: 64,
             vendor_code: 1,
-            // This sounds useful but in reality is really annoying.
-            // TODO: Maybe we can make it pop-up only in certain circumstances?
-            //landing_url: Some(Url::new("https://dpedal.com/config.html")),
+            // Intentionally set the landing_url to None.
+            // This feature sounds useful but in reality is really annoying for regular users.
             landing_url: None,
         });
 
@@ -68,10 +69,14 @@ impl WebConfig {
         let write_ep = alt.endpoint_bulk_in(None, 64);
         let read_ep = alt.endpoint_bulk_out(None, 64);
 
+        static COBS_BUF: StaticCell<CobsAccumulator<CONFIG_SIZE>> = StaticCell::new();
+        let cobs_buf = COBS_BUF.init(CobsAccumulator::new());
+
         Self {
             write_ep,
             read_ep,
             config_flash,
+            cobs_buf,
         }
     }
 
@@ -90,10 +95,10 @@ impl WebConfig {
     async fn echo(&mut self) {
         let mut packet_buf = [0; 64];
         'skip_request: loop {
-            let mut cobs_buf: CobsAccumulator<1024> = CobsAccumulator::new();
+            *self.cobs_buf = CobsAccumulator::new();
             let request = loop {
                 let n = self.read_ep.read(&mut packet_buf).await.unwrap();
-                match cobs_buf.feed::<Request>(&packet_buf[..n]) {
+                match self.cobs_buf.feed::<Request>(&packet_buf[..n]) {
                     postcard::accumulator::FeedResult::Consumed => {}
                     postcard::accumulator::FeedResult::OverFull(_items) => {
                         error!("request exceeded 1024 bytes");
@@ -118,7 +123,7 @@ impl WebConfig {
                     defmt::info!("set config {:?}", array_vec.as_ref());
                     if let Err(()) = self
                         .config_flash
-                        .load_config_bytes_to_flash_and_reload_config(array_vec)
+                        .load_config_bytes_to_flash_and_reload_config(&array_vec)
                         .await
                     {
                         // TODO: return error over protocol

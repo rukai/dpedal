@@ -9,7 +9,7 @@ pub const PICO_FLASH_SIZE: usize = 1024 * 1024 * 2; // 2 MiB
 pub const FIRMWARE_OFFSET: usize = 0;
 pub const FIRMWARE_SIZE: usize = 1024 * 2000; // 2000 KiB
 pub const CONFIG_OFFSET: usize = 1024 * 2000;
-pub const CONFIG_SIZE: usize = 1024 * 16; // 16 KiB // TODO: give more space to config, currently increasing this causes problems, see dpedal_firmware/src/config.rs
+pub const CONFIG_SIZE: usize = 1024 * 16; // 16 KiB // TODO: This is used to allocate space for config stored under different conditions e.g. serialized by different serialization techniques. At high config usage we could get weird failures. Need to clarify these usages.
 
 use arrayvec::{ArrayString, ArrayVec};
 use defmt::Format;
@@ -38,7 +38,7 @@ pub struct Config {
     pub nickname: ArrayString<50>,
     pub device: Device,
     pub color: u32,
-    pub profiles: ArrayVec<Profile, 2>,
+    pub profiles: ArrayVec<Profile, 5>,
     pub pin_remappings: ArrayVec<PinRemapping, 6>,
 }
 
