@@ -2,7 +2,7 @@ use crate::config::CONFIG;
 use crate::keyboard::{KEYBOARD_CHANNEL, KeyboardEvent};
 use crate::mouse::{MOUSE_CHANNEL, MouseEvent};
 use arrayvec::ArrayVec;
-use dpedal_config::{ComputerInput, DpedalInput, MAX_MAPPINGS};
+use dpedal_config::{ComputerInput, DPedalControl, DpedalInput, MAX_MAPPINGS};
 use embassy_rp::gpio::{AnyPin, Input, Pin, Pull};
 use embassy_rp::{Peri, PeripheralType};
 use embassy_time::Timer;
@@ -47,9 +47,10 @@ impl Inputs {
         let dpad_right = input(self.pins[dpad_right_pin].take().unwrap());
 
         let mut mapping_state = ArrayVec::<_, MAX_MAPPINGS>::new();
+        let mut state = InputControlState { current_profile: 0 };
         loop {
             let config = CONFIG.lock().await.clone().unwrap();
-            if let Some(profile) = config.profiles.first() {
+            if let Some(profile) = config.profiles.get(state.current_profile as usize) {
                 let input_state = DpedalInputState {
                     button_left: button_left.is_low(),
                     button_right: button_right.is_low(),
@@ -70,20 +71,57 @@ impl Inputs {
                 {
                     if input_state.is_all_pressed(&mapping.input) {
                         for output in &mapping.output {
-                            pressed(*output).await;
+                            Inputs::pressed(*output).await;
                         }
                         *mapping_state = MappingState::Pressed;
                     } else {
                         for output in &mapping.output {
                             if let MappingState::Pressed = mapping_state {
-                                released(*output).await;
+                                Inputs::released(*output, &mut state).await;
                             }
                         }
                         *mapping_state = MappingState::Released;
                     }
                 }
+            } else {
+                defmt::error!("No profile with index {}", state.current_profile)
             }
             Timer::after_millis(1).await;
+        }
+    }
+
+    async fn pressed(input: ComputerInput) {
+        match input {
+            ComputerInput::None => {}
+            ComputerInput::Keyboard(key) => {
+                KEYBOARD_CHANNEL.send(KeyboardEvent::Pressed(key)).await
+            }
+            ComputerInput::Mouse(mouse) => MOUSE_CHANNEL.send(MouseEvent::Pressed(mouse)).await,
+            ComputerInput::Control(_) => {}
+        }
+    }
+
+    async fn released(input: ComputerInput, state: &mut InputControlState) {
+        match input {
+            ComputerInput::None => {}
+            ComputerInput::Keyboard(key) => {
+                KEYBOARD_CHANNEL.send(KeyboardEvent::Released(key)).await
+            }
+            ComputerInput::Mouse(mouse) => MOUSE_CHANNEL.send(MouseEvent::Released(mouse)).await,
+            ComputerInput::Control(control) => state.update(control),
+        }
+    }
+}
+
+struct InputControlState {
+    current_profile: u8,
+}
+
+impl InputControlState {
+    fn update(&mut self, event: DPedalControl) {
+        match event {
+            DPedalControl::DoNothing => {}
+            DPedalControl::SetProfile(profile) => self.current_profile = profile,
         }
     }
 }
@@ -127,24 +165,6 @@ impl DpedalInputState {
             }
         }
         true
-    }
-}
-
-async fn pressed(input: ComputerInput) {
-    match input {
-        ComputerInput::None => {}
-        ComputerInput::Keyboard(key) => KEYBOARD_CHANNEL.send(KeyboardEvent::Pressed(key)).await,
-        ComputerInput::Mouse(mouse) => MOUSE_CHANNEL.send(MouseEvent::Pressed(mouse)).await,
-        ComputerInput::Control(_) => {}
-    }
-}
-
-async fn released(input: ComputerInput) {
-    match input {
-        ComputerInput::None => {}
-        ComputerInput::Keyboard(key) => KEYBOARD_CHANNEL.send(KeyboardEvent::Released(key)).await,
-        ComputerInput::Mouse(mouse) => MOUSE_CHANNEL.send(MouseEvent::Released(mouse)).await,
-        ComputerInput::Control(_) => {}
     }
 }
 

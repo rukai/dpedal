@@ -773,13 +773,14 @@ pub enum DPedalControl {
     DoNothing,
     // ReleaseAndSleep(u16)
     // HoldAndSleep(u16)
-    // SetProfile(u8)
+    SetProfile(u8),
 }
 
 impl DPedalControl {
-    pub fn from_string(s: &str) -> Option<Self> {
+    pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
             "DoNothing" => Some(DPedalControl::DoNothing),
+            "SetProfile" => Some(DPedalControl::SetProfile(value.parse().ok()?)),
             _ => None,
         }
     }
