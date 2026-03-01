@@ -67,7 +67,7 @@ impl ConfigFlash {
 
     pub async fn load_config_bytes_to_flash_and_reload_config(
         &mut self,
-        bytes: ArrayVec<u8, CONFIG_SIZE>,
+        bytes: &ArrayVec<u8, CONFIG_SIZE>,
     ) -> Result<(), ()> {
         let size = bytes.len();
         if size > CONFIG_SIZE {
@@ -75,7 +75,7 @@ impl ConfigFlash {
             return Err(());
         }
 
-        self.check_valid_config(&bytes)?;
+        self.check_valid_config(bytes)?;
         // TODO: Upstream this check, blocking_erase is not sound
         let block_aligned_size = (4 + size as u32).div_ceil(4096) * 4096;
         self.flash
@@ -86,7 +86,7 @@ impl ConfigFlash {
             .unwrap();
 
         let mut final_bytes: ArrayVec<u8, CONFIG_SIZE> = ArrayVec::from_iter(size.to_be_bytes());
-        final_bytes.extend(bytes);
+        final_bytes.extend(bytes.iter().cloned());
         self.flash
             .blocking_write(CONFIG_OFFSET as u32, &final_bytes)
             .unwrap();

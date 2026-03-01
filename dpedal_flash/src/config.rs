@@ -62,7 +62,7 @@ pub struct ConfigKdl {
     pub nickname: Parsed<ArrayString<50>>,
     pub device: Parsed<DeviceKdl>,
     pub color: Parsed<u32>,
-    pub profiles: Parsed<ArrayVec<Parsed<ProfileKdl>, 2>>,
+    pub profiles: Parsed<ArrayVec<Parsed<ProfileKdl>, 5>>,
     // TODO: add validation: no duplicate pins (including default values), valid pin range
     pub pin_remappings: Parsed<ArrayVec<Parsed<PinRemappingKdl>, 6>>,
 }
