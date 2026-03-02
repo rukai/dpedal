@@ -241,7 +241,13 @@ fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
         "keyboard" => KeyboardInput::from_str(&sub_ty_value)
             .ok()
             .map(ComputerInput::Keyboard),
-        "control" => DPedalControl::from_string(&sub_ty_value).map(ComputerInput::Control),
+        "control" => {
+            let field = ElementChildIterator::new(&sub_ty_fields_span)
+                .next()
+                .map(|x| x.dyn_ref::<HtmlInputElement>().unwrap().value())
+                .unwrap_or("".into());
+            DPedalControl::from_string(&sub_ty_value, &field).map(ComputerInput::Control)
+        }
         _ => None,
     }
 }
@@ -377,7 +383,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
             let variant_string = format!("{mouse_input:?}");
             let variant_name = variant_string.split('(').next().unwrap();
             select_subtype.set_value(variant_name);
-            setup_subtype_fields(&subtype_fields_span, mouse_input);
+            setup_subtype_fields_mouse(&subtype_fields_span, mouse_input);
 
             let select_subtype_clone = select_subtype.clone();
             let subtype_fields_span = subtype_fields_span.clone();
@@ -387,7 +393,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
                     // Create a default for the selected MouseInput
                     let mouse_input =
                         MouseInput::from_string(&select_subtype_clone.value(), "10").unwrap();
-                    setup_subtype_fields(&subtype_fields_span, &mouse_input);
+                    setup_subtype_fields_mouse(&subtype_fields_span, &mouse_input);
                 }) as Box<dyn FnMut()>,
             );
         }
@@ -413,12 +419,33 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
         ComputerInput::Control(control) => {
             let mut options = String::new();
             for variant in DPedalControl::iter() {
+                // bit hacky but extract the variant name from the Debug string
+                // which may include variant fields which need to be stripped off.
+                let variant_string = format!("{variant:?}");
+                let variant_name = variant_string.split('(').next().unwrap();
+
                 options.push_str(&format!(
-                    "<option value=\"{variant:?}\">{variant:?}</option>"
+                    "<option value=\"{variant_name}\">{variant_name}</option>"
                 ));
             }
             select_subtype.set_inner_html(&options);
-            select_subtype.set_value(&format!("{control:?}"));
+
+            let variant_string = format!("{control:?}");
+            let variant_name = variant_string.split('(').next().unwrap();
+            select_subtype.set_value(variant_name);
+            setup_subtype_fields_control(&subtype_fields_span, control);
+
+            let select_subtype_clone = select_subtype.clone();
+            let subtype_fields_span = subtype_fields_span.clone();
+            set_onchange(
+                select_subtype,
+                Box::new(move || {
+                    // Create a default for the selected DPedalControl
+                    let control =
+                        DPedalControl::from_string(&select_subtype_clone.value(), "0").unwrap();
+                    setup_subtype_fields_control(&subtype_fields_span, &control);
+                }) as Box<dyn FnMut()>,
+            );
         }
     }
     span.append_child(&subtype_fields_span).unwrap();
@@ -440,7 +467,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     );
 }
 
-fn setup_subtype_fields(span: &Element, mouse_input: &MouseInput) {
+fn setup_subtype_fields_mouse(span: &Element, mouse_input: &MouseInput) {
     let document = web_sys::window().unwrap().document().unwrap();
 
     // Remove any existing children
@@ -469,6 +496,31 @@ fn setup_subtype_fields(span: &Element, mouse_input: &MouseInput) {
             span.append_child(input_field).unwrap();
         }
         MouseInput::ClickLeft | MouseInput::ClickMiddle | MouseInput::ClickRight => {}
+    }
+}
+
+fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
+    let document = web_sys::window().unwrap().document().unwrap();
+
+    // Remove any existing children
+    for child in ElementChildIterator::new(span).collect::<Vec<_>>().iter() {
+        child.remove();
+    }
+
+    // Add new children
+    match control {
+        DPedalControl::SetProfile(x) => {
+            let input_field = document.create_element("input").unwrap();
+            let input_field = input_field.dyn_ref::<HtmlInputElement>().unwrap();
+            input_field.set_type("number");
+            input_field.set_value(&x.to_string());
+            input_field.style().set_css_text("font-size:2em;");
+            input_field.set_min("0");
+            input_field.set_max("1000");
+            input_field.set_required(true);
+            span.append_child(input_field).unwrap();
+        }
+        DPedalControl::DoNothing => {}
     }
 }
 

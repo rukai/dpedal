@@ -41,7 +41,7 @@ impl ConfigFlash {
     }
 
     pub fn load_config_bytes_from_flash(&mut self) -> Result<Align<ArrayVec<u8, CONFIG_SIZE>>, ()> {
-        // TODO: store in heap instead, apparently only 2kb of stack o.0
+        // TODO: reduce stack usage
         let mut bytes = [0u8; CONFIG_SIZE];
         self.flash
             .blocking_read(CONFIG_OFFSET as u32, &mut bytes)

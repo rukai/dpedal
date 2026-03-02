@@ -1,6 +1,18 @@
 #![no_main]
 #![no_std]
 
+//! Stack usage.
+//! The DPedal firmware does not use an allocator.
+//! Maybe it should, but its interesting to try writing software without an allocator,
+//! and assuming we are well under the memory limit, using static buffers should make OoM issues impossible.
+//!
+//! However, currently dpedal stores huge values on the stack, which is problematic because:
+//! * The RP2040 only has 256KB of RAM
+//! * embassy/async exacerbates stack usage issues
+//!
+//! memory.x is setup to assert that the linker has allocated at least 64KB of stack.
+//! Currently, the firmware works fine, but long term we should move anything >= 1024 bytes off of the stack to avoid stack overflow issues.
+
 mod config;
 mod input;
 mod keyboard;
