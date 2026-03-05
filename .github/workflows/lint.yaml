@@ -42,15 +42,7 @@ jobs:
           cd ../dpedal_firmware
           cargo fmt --all -- --check
       - name: Ensure that all crates compile and have no warnings under every possible combination of features
-        # some things to explicitly point out:
-        # * clippy also reports rustc warnings and errors
-        # * clippy --all-targets causes clippy to run against tests and examples which it doesnt do by default.
-        run: |
-          cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings
-          cd dpedal_config_web_app
-          cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings
-          cd ../dpedal_firmware
-          cargo hack --feature-powerset clippy --locked -- -D warnings
+        run: bash scripts/clippy.sh
       - name: Ensure that tests did not create or modify any files that arent .gitignore'd
         run: |
           if [ -n "$(git status --porcelain)" ]; then
