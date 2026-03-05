@@ -196,6 +196,7 @@ async fn write_config(
     let color = color.dyn_ref::<HtmlInputElement>().unwrap();
     config.color = u32::from_str_radix(color.value().strip_prefix("#").unwrap(), 16).unwrap();
 
+    // TODO: multi-profile support - this discards all profiles except the first
     config.profiles = ArrayVec::from_iter([Profile { mappings }]);
 
     let config_bytes =
@@ -331,10 +332,7 @@ fn create_row_output<const CAP: usize>(
 fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     let document = web_sys::window().unwrap().document().unwrap();
 
-    // Remove any existing children
-    for child in ElementChildIterator::new(span).collect::<Vec<_>>().iter() {
-        child.remove();
-    }
+    clear_children(span);
 
     // Add new children
     let select_type = document.create_element("select").unwrap();
@@ -369,20 +367,11 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
         ComputerInput::Mouse(mouse_input) => {
             let mut options = String::new();
             for variant in MouseInput::iter() {
-                // bit hacky but extract the variant name from the Debug string
-                // which may include variant fields which need to be stripped off.
-                let variant_string = format!("{variant:?}");
-                let variant_name = variant_string.split('(').next().unwrap();
-
-                options.push_str(&format!(
-                    "<option value=\"{variant_name}\">{variant_name}</option>"
-                ));
+                let name = variant_name(&variant);
+                options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
             }
             select_subtype.set_inner_html(&options);
-
-            let variant_string = format!("{mouse_input:?}");
-            let variant_name = variant_string.split('(').next().unwrap();
-            select_subtype.set_value(variant_name);
+            select_subtype.set_value(&variant_name(mouse_input));
             setup_subtype_fields_mouse(&subtype_fields_span, mouse_input);
 
             let select_subtype_clone = select_subtype.clone();
@@ -419,20 +408,11 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
         ComputerInput::Control(control) => {
             let mut options = String::new();
             for variant in DPedalControl::iter() {
-                // bit hacky but extract the variant name from the Debug string
-                // which may include variant fields which need to be stripped off.
-                let variant_string = format!("{variant:?}");
-                let variant_name = variant_string.split('(').next().unwrap();
-
-                options.push_str(&format!(
-                    "<option value=\"{variant_name}\">{variant_name}</option>"
-                ));
+                let name = variant_name(&variant);
+                options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
             }
             select_subtype.set_inner_html(&options);
-
-            let variant_string = format!("{control:?}");
-            let variant_name = variant_string.split('(').next().unwrap();
-            select_subtype.set_value(variant_name);
+            select_subtype.set_value(&variant_name(control));
             setup_subtype_fields_control(&subtype_fields_span, control);
 
             let select_subtype_clone = select_subtype.clone();
@@ -468,15 +448,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
 }
 
 fn setup_subtype_fields_mouse(span: &Element, mouse_input: &MouseInput) {
-    let document = web_sys::window().unwrap().document().unwrap();
-
-    // Remove any existing children
-    for child in ElementChildIterator::new(span).collect::<Vec<_>>().iter() {
-        child.remove();
-    }
-
-    // Add new children
-    match mouse_input {
+    let value = match mouse_input {
         MouseInput::ScrollUp(x)
         | MouseInput::ScrollDown(x)
         | MouseInput::ScrollRight(x)
@@ -484,43 +456,45 @@ fn setup_subtype_fields_mouse(span: &Element, mouse_input: &MouseInput) {
         | MouseInput::MoveUp(x)
         | MouseInput::MoveDown(x)
         | MouseInput::MoveRight(x)
-        | MouseInput::MoveLeft(x) => {
-            let input_field = document.create_element("input").unwrap();
-            let input_field = input_field.dyn_ref::<HtmlInputElement>().unwrap();
-            input_field.set_type("number");
-            input_field.set_value(&x.to_string());
-            input_field.style().set_css_text("font-size:2em;");
-            input_field.set_min("0");
-            input_field.set_max("1000");
-            input_field.set_required(true);
-            span.append_child(input_field).unwrap();
-        }
-        MouseInput::ClickLeft | MouseInput::ClickMiddle | MouseInput::ClickRight => {}
-    }
+        | MouseInput::MoveLeft(x) => Some(*x as i32),
+        MouseInput::ClickLeft | MouseInput::ClickMiddle | MouseInput::ClickRight => None,
+    };
+    setup_subtype_fields_numeric(span, value);
 }
 
 fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
-    let document = web_sys::window().unwrap().document().unwrap();
+    let value = match control {
+        DPedalControl::SetProfile(x) => Some(*x as i32),
+        DPedalControl::DoNothing => None,
+    };
+    setup_subtype_fields_numeric(span, value);
+}
 
-    // Remove any existing children
-    for child in ElementChildIterator::new(span).collect::<Vec<_>>().iter() {
-        child.remove();
+fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
+    clear_children(span);
+    if let Some(x) = value {
+        let document = web_sys::window().unwrap().document().unwrap();
+        let input_field = document.create_element("input").unwrap();
+        let input_field = input_field.dyn_ref::<HtmlInputElement>().unwrap();
+        input_field.set_type("number");
+        input_field.set_value(&x.to_string());
+        input_field.style().set_css_text("font-size:2em;");
+        input_field.set_min("0");
+        input_field.set_max("1000");
+        input_field.set_required(true);
+        span.append_child(input_field).unwrap();
     }
+}
 
-    // Add new children
-    match control {
-        DPedalControl::SetProfile(x) => {
-            let input_field = document.create_element("input").unwrap();
-            let input_field = input_field.dyn_ref::<HtmlInputElement>().unwrap();
-            input_field.set_type("number");
-            input_field.set_value(&x.to_string());
-            input_field.style().set_css_text("font-size:2em;");
-            input_field.set_min("0");
-            input_field.set_max("1000");
-            input_field.set_required(true);
-            span.append_child(input_field).unwrap();
-        }
-        DPedalControl::DoNothing => {}
+// TODO: This is a hack
+// extract the variant name from the Debug string, stripping any tuple fields e.g. `ScrollUp(10)` -> `"ScrollUp"`.
+fn variant_name(val: &impl std::fmt::Debug) -> String {
+    format!("{val:?}").split('(').next().unwrap().to_owned()
+}
+
+fn clear_children(el: &Element) {
+    for child in ElementChildIterator::new(el).collect::<Vec<_>>() {
+        child.remove();
     }
 }
 
