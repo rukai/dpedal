@@ -73,7 +73,6 @@ pub struct PinRemapping {
 }
 
 pub const MAX_MAPPINGS: usize = 20;
-pub const MAX_DPEDAL_INPUTS: usize = 4;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Profile {
@@ -115,6 +114,7 @@ impl Default for Profile {
     }
 }
 
+pub const MAX_DPEDAL_INPUTS: usize = 4;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Mapping {

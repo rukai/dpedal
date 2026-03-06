@@ -6,6 +6,7 @@ use dpedal_config::DPedalControl;
 use dpedal_config::Device as DPedalDevice;
 use dpedal_config::DpedalInput;
 use dpedal_config::KeyboardInput;
+use dpedal_config::MAX_DPEDAL_INPUTS;
 use dpedal_config::MAX_PROFILES;
 use dpedal_config::Mapping;
 use dpedal_config::MouseInput;
@@ -199,12 +200,12 @@ async fn write_config(
         for row in ElementChildIter::new(&table).skip(1) {
             let mut cells = ElementChildIter::new(&row);
 
-            let input_select = ElementChildIter::new(&cells.next().unwrap())
-                .next()
-                .unwrap();
-            let input_select = input_select.dyn_ref::<HtmlSelectElement>().unwrap();
-            let input_str = input_select.value();
-            let input = ArrayVec::from_iter([DpedalInput::from_string(&input_str).unwrap()]);
+            let input_cell = cells.next().unwrap();
+            let selects_container = ElementChildIter::new(&input_cell).nth(2).unwrap();
+            let input = ArrayVec::from_iter(ElementChildIter::new(&selects_container).map(|el| {
+                let s = el.dyn_ref::<HtmlSelectElement>().unwrap();
+                DpedalInput::from_string(&s.value()).unwrap()
+            }));
 
             let output = parse_output_cell(&cells.next().unwrap());
             mappings.push(Mapping { input, output });
@@ -391,13 +392,9 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
     tr
 }
 
-fn create_row_input<const CAP: usize>(
-    document: &Document,
-    inputs: &ArrayVec<DpedalInput, CAP>,
-) -> Element {
-    let td = document.create_element("td").unwrap();
+fn create_dpedal_input_select(document: &Document, value: &DpedalInput) -> HtmlSelectElement {
     let select = document.create_element("select").unwrap();
-    let select = select.dyn_ref::<HtmlSelectElement>().unwrap();
+    let select = select.dyn_into::<HtmlSelectElement>().unwrap();
     let mut options = String::new();
     for variant in DpedalInput::iter() {
         let name: &str = (&variant).into();
@@ -405,10 +402,93 @@ fn create_row_input<const CAP: usize>(
     }
     select.set_inner_html(&options);
     select.style().set_css_text("font-size:2em;");
-    if let Some(input) = inputs.first() {
-        select.set_value(<&str>::from(input));
+    select.set_value(<&str>::from(value));
+    select
+}
+
+fn update_input_buttons(
+    container: &Element,
+    add_button: &HtmlElement,
+    remove_button: &HtmlElement,
+) {
+    let count = container.children().length();
+    if count >= MAX_DPEDAL_INPUTS as u32 {
+        add_button.set_attribute("disabled", "").unwrap();
+    } else {
+        add_button.remove_attribute("disabled").unwrap();
     }
-    td.append_child(select).unwrap();
+    if count == 0 {
+        remove_button.set_attribute("disabled", "").unwrap();
+    } else {
+        remove_button.remove_attribute("disabled").unwrap();
+    }
+}
+
+fn create_row_input<const CAP: usize>(
+    document: &Document,
+    inputs: &ArrayVec<DpedalInput, CAP>,
+) -> Element {
+    let td = document.create_element("td").unwrap();
+    td.dyn_ref::<HtmlElement>()
+        .unwrap()
+        .style()
+        .set_css_text("display:flex; align-items:flex-start;");
+
+    let add_button = document.create_element("button").unwrap();
+    let add_button = add_button.dyn_into::<HtmlElement>().unwrap();
+    add_button.set_inner_text("✚");
+    add_button
+        .style()
+        .set_css_text("color:green;font-size:2em;");
+    td.append_child(&add_button).unwrap();
+
+    let remove_button = document.create_element("button").unwrap();
+    let remove_button = remove_button.dyn_into::<HtmlElement>().unwrap();
+    remove_button.set_inner_text("✖");
+    remove_button
+        .style()
+        .set_css_text("color:red;font-size:2em;");
+    td.append_child(&remove_button).unwrap();
+
+    let container = document.create_element("div").unwrap();
+    for input in inputs {
+        let select = create_dpedal_input_select(document, input);
+        container.append_child(&select).unwrap();
+    }
+    td.append_child(&container).unwrap();
+
+    update_input_buttons(&container, &add_button, &remove_button);
+
+    {
+        let document = document.clone();
+        let container = container.clone();
+        let add_button_clone = add_button.clone();
+        let remove_button_clone = remove_button.clone();
+        set_onclick(
+            &add_button,
+            Box::new(move || {
+                let select = create_dpedal_input_select(&document, &DpedalInput::default());
+                container.append_child(&select).unwrap();
+                update_input_buttons(&container, &add_button_clone, &remove_button_clone);
+            }) as Box<dyn FnMut()>,
+        );
+    }
+
+    {
+        let container = container.clone();
+        let add_button_clone = add_button.clone();
+        let remove_button_clone = remove_button.clone();
+        set_onclick(
+            &remove_button,
+            Box::new(move || {
+                if let Some(last) = container.last_element_child() {
+                    last.remove();
+                }
+                update_input_buttons(&container, &add_button_clone, &remove_button_clone);
+            }) as Box<dyn FnMut()>,
+        );
+    }
+
     td
 }
 
