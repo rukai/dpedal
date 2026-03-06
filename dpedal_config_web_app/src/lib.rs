@@ -3,10 +3,12 @@ use arrayvec::ArrayVec;
 use dpedal_config::ComputerInput;
 use dpedal_config::Config;
 use dpedal_config::DPedalControl;
+use dpedal_config::Device as DPedalDevice;
 use dpedal_config::DpedalInput;
 use dpedal_config::KeyboardInput;
 use dpedal_config::Mapping;
 use dpedal_config::MouseInput;
+use dpedal_config::PinRemapping;
 use dpedal_config::Profile;
 use dpedal_config::web_config_protocol::Request;
 use dpedal_config::web_config_protocol::Response;
@@ -28,13 +30,12 @@ use crate::device::Device;
 
 mod device;
 mod element_iterator;
-
 #[wasm_bindgen]
 pub fn run() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(Level::Info).expect("could not initialize logger");
 
-    let document = web_sys::window().unwrap().document().unwrap();
+    let document = get_document();
     set_button_on_click(
         &document,
         "open-device",
@@ -44,8 +45,9 @@ pub fn run() {
     );
 }
 
+/// Opens a webusb device, creating (or replacing the existing) #mapping-section with UI for configuring the device
 async fn open_device() {
-    let document = web_sys::window().unwrap().document().unwrap();
+    let document = get_document();
     set_error(&document, "");
 
     let device = match Device::new().await {
@@ -110,21 +112,27 @@ async fn open_device() {
     }
     log::info!("device config {:#?}", config);
 
+    let preserved = PreservedConfig {
+        version: config.version,
+        device: config.device,
+        pin_remappings: config.pin_remappings,
+    };
+
     let device = Rc::new(device);
     set_button_on_click(
         &document,
         "save",
         Box::new(move || {
             let device = device.clone();
-            let config = config.clone();
-            wasm_bindgen_futures::spawn_local(write_config_task(device, config));
+            let preserved = preserved.clone();
+            wasm_bindgen_futures::spawn_local(write_config_task(device, preserved));
         }) as Box<dyn FnMut()>,
     );
 
     log::info!("Setup complete");
 }
 
-pub async fn sleep(millis: i32) {
+async fn sleep(millis: i32) {
     let promise = js_sys::Promise::new(&mut |resolve, _| {
         web_sys::window()
             .unwrap()
@@ -135,13 +143,13 @@ pub async fn sleep(millis: i32) {
     JsFuture::from(promise).await.unwrap();
 }
 
-async fn write_config_task(device: Rc<Device>, config: Config) {
-    let document = web_sys::window().unwrap().document().unwrap();
+async fn write_config_task(device: Rc<Device>, preserved: PreservedConfig) {
+    let document = get_document();
     let save_result = document.get_element_by_id("save-result").unwrap();
     let save_result = save_result.dyn_ref::<HtmlElement>().unwrap();
     save_result.set_inner_html("🌀");
 
-    if let Err(err) = write_config(&document, device, config).await {
+    if let Err(err) = write_config(&document, device, preserved).await {
         save_result.set_inner_html("❌");
         set_error(&document, &err);
         return;
@@ -163,7 +171,7 @@ async fn write_config_task(device: Rc<Device>, config: Config) {
 async fn write_config(
     document: &Document,
     device: Rc<Device>,
-    mut config: Config,
+    preserved: PreservedConfig,
 ) -> Result<(), String> {
     let table = document.get_element_by_id("input-output-table").unwrap();
 
@@ -185,19 +193,26 @@ async fn write_config(
 
     let name = document.get_element_by_id("device_name").unwrap();
     let name = name.dyn_ref::<HtmlInputElement>().unwrap();
-    config.nickname = ArrayString::from(&name.value()).map_err(|_| {
+    let nickname = ArrayString::from(&name.value()).map_err(|_| {
         format!(
             "nickname must be <= 50 characters long, but was {} characters long",
             name.value().len()
         )
     })?;
 
-    let color = document.get_element_by_id("device_color").unwrap();
-    let color = color.dyn_ref::<HtmlInputElement>().unwrap();
-    config.color = u32::from_str_radix(color.value().strip_prefix("#").unwrap(), 16).unwrap();
+    let color_element = document.get_element_by_id("device_color").unwrap();
+    let color_element = color_element.dyn_ref::<HtmlInputElement>().unwrap();
+    let color = u32::from_str_radix(color_element.value().strip_prefix("#").unwrap(), 16).unwrap();
 
-    // TODO: multi-profile support - this discards all profiles except the first
-    config.profiles = ArrayVec::from_iter([Profile { mappings }]);
+    // TODO: multi-profile support
+    let config = Config {
+        version: preserved.version,
+        nickname,
+        device: preserved.device,
+        color,
+        profiles: ArrayVec::from_iter([Profile { mappings }]),
+        pin_remappings: preserved.pin_remappings,
+    };
 
     let config_bytes =
         ArrayVec::from_iter(rkyv::to_bytes::<Error>(&config).unwrap().iter().cloned());
@@ -330,7 +345,7 @@ fn create_row_output<const CAP: usize>(
 /// Create or recreate a single output span.
 /// The output cell of the mapping table can contain many of these spans, each corresponding to a distinct output or step in a dpedal macro.
 fn setup_single_output_span(span: &Element, output: &ComputerInput) {
-    let document = web_sys::window().unwrap().document().unwrap();
+    let document = get_document();
 
     clear_children(span);
 
@@ -367,11 +382,11 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
         ComputerInput::Mouse(mouse_input) => {
             let mut options = String::new();
             for variant in MouseInput::iter() {
-                let name = variant_name(&variant);
+                let name: &str = (&variant).into();
                 options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
             }
             select_subtype.set_inner_html(&options);
-            select_subtype.set_value(&variant_name(mouse_input));
+            select_subtype.set_value(<&str>::from(mouse_input));
             setup_subtype_fields_mouse(&subtype_fields_span, mouse_input);
 
             let select_subtype_clone = select_subtype.clone();
@@ -408,11 +423,11 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
         ComputerInput::Control(control) => {
             let mut options = String::new();
             for variant in DPedalControl::iter() {
-                let name = variant_name(&variant);
+                let name: &str = (&variant).into();
                 options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
             }
             select_subtype.set_inner_html(&options);
-            select_subtype.set_value(&variant_name(control));
+            select_subtype.set_value(<&str>::from(control));
             setup_subtype_fields_control(&subtype_fields_span, control);
 
             let select_subtype_clone = select_subtype.clone();
@@ -473,7 +488,7 @@ fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
 fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
     clear_children(span);
     if let Some(x) = value {
-        let document = web_sys::window().unwrap().document().unwrap();
+        let document = get_document();
         let input_field = document.create_element("input").unwrap();
         let input_field = input_field.dyn_ref::<HtmlInputElement>().unwrap();
         input_field.set_type("number");
@@ -486,16 +501,14 @@ fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
     }
 }
 
-// TODO: This is a hack
-// extract the variant name from the Debug string, stripping any tuple fields e.g. `ScrollUp(10)` -> `"ScrollUp"`.
-fn variant_name(val: &impl std::fmt::Debug) -> String {
-    format!("{val:?}").split('(').next().unwrap().to_owned()
-}
-
 fn clear_children(el: &Element) {
-    for child in ElementChildIterator::new(el).collect::<Vec<_>>() {
+    while let Some(child) = el.first_element_child() {
         child.remove();
     }
+}
+
+fn get_document() -> web_sys::Document {
+    web_sys::window().unwrap().document().unwrap()
 }
 
 fn set_button_on_click(document: &Document, id: &str, closure: Box<dyn FnMut()>) {
@@ -517,4 +530,13 @@ fn set_onchange(select: &HtmlElement, closure: Box<dyn FnMut()>) {
 
     // Need to forget closure otherwise the destructor destroys it ;-;
     closure.forget();
+}
+
+/// The fields from the device's config that are not editable via the UI and must be
+/// round-tripped back when saving, so they aren't silently discarded.
+#[derive(Clone)]
+struct PreservedConfig {
+    version: u32,
+    device: DPedalDevice,
+    pin_remappings: ArrayVec<PinRemapping, 6>,
 }
