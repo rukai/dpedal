@@ -107,7 +107,7 @@ async fn open_device() {
     for (i, profile) in config.profiles.iter().enumerate() {
         gen_for_profile(&document, profile, i);
     }
-    update_profile_buttons(&document);
+    update_add_profile_button(&document);
     log::info!("device config {:#?}", config);
 
     set_button_on_click(
@@ -119,7 +119,7 @@ async fn open_device() {
             let count = ElementChildIterator::new(&container).count();
             if count < MAX_PROFILES {
                 gen_for_profile(&document, &Profile::default(), count);
-                update_profile_buttons(&document);
+                update_add_profile_button(&document);
             }
         }) as Box<dyn FnMut()>,
     );
@@ -324,10 +324,25 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     }
     profile_section.append_child(&table).unwrap();
 
+    let remove_button = document.create_element("button").unwrap();
+    let remove_button = remove_button.dyn_ref::<HtmlElement>().unwrap();
+    remove_button.set_inner_text("Remove Profile");
+    let profile_section_clone = profile_section.clone();
+    set_onclick(
+        remove_button,
+        Box::new(move || {
+            profile_section_clone.remove();
+            let document = get_document();
+            renumber_profiles(&document);
+            update_add_profile_button(&document);
+        }) as Box<dyn FnMut()>,
+    );
+    profile_section.append_child(remove_button).unwrap();
+
     profiles_container.append_child(&profile_section).unwrap();
 }
 
-fn update_profile_buttons(document: &Document) {
+fn update_add_profile_button(document: &Document) {
     let container = document.get_element_by_id("profiles-container").unwrap();
     let count = ElementChildIterator::new(&container).count();
     let add_button = document
@@ -562,16 +577,32 @@ fn get_document() -> web_sys::Document {
 }
 
 fn set_button_on_click(document: &Document, id: &str, closure: Box<dyn FnMut()>) {
-    let closure = Closure::wrap(closure);
-    document
+    let button = document
         .get_element_by_id(id)
         .unwrap()
-        .dyn_ref::<HtmlElement>()
-        .unwrap()
-        .set_onclick(Some(closure.as_ref().unchecked_ref()));
+        .dyn_into::<HtmlElement>()
+        .unwrap();
+    set_onclick(&button, closure);
+}
+
+fn set_onclick(element: &HtmlElement, closure: Box<dyn FnMut()>) {
+    let closure = Closure::wrap(closure);
+    element.set_onclick(Some(closure.as_ref().unchecked_ref()));
 
     // Need to forget closure otherwise the destructor destroys it ;-;
     closure.forget();
+}
+
+fn renumber_profiles(document: &Document) {
+    let container = document.get_element_by_id("profiles-container").unwrap();
+    for (i, profile_section) in ElementChildIterator::new(&container).enumerate() {
+        let heading = ElementChildIterator::new(&profile_section)
+            .next()
+            .unwrap()
+            .dyn_into::<HtmlElement>()
+            .unwrap();
+        heading.set_inner_text(&format!("Profile {i}"));
+    }
 }
 
 fn set_onchange(select: &HtmlElement, closure: Box<dyn FnMut()>) {
