@@ -1,5 +1,5 @@
 use arrayvec::{ArrayString, ArrayVec};
-use dpedal_config::{ComputerInput, Config, DpedalInput, KeyboardInput, MouseInput};
+use dpedal_config::{ComputerInput, Config, DpedalInput, KeyboardInput, MAX_PROFILES, MouseInput};
 use kdl::{KdlDocument, KdlNode};
 use kdl_config::{
     KdlConfig, KdlConfigFinalize, Parsed,
@@ -62,7 +62,7 @@ pub struct ConfigKdl {
     pub nickname: Parsed<ArrayString<50>>,
     pub device: Parsed<DeviceKdl>,
     pub color: Parsed<u32>,
-    pub profiles: Parsed<ArrayVec<Parsed<ProfileKdl>, 5>>,
+    pub profiles: Parsed<ArrayVec<Parsed<ProfileKdl>, MAX_PROFILES>>,
     // TODO: add validation: no duplicate pins (including default values), valid pin range
     pub pin_remappings: Parsed<ArrayVec<Parsed<PinRemappingKdl>, 6>>,
 }
