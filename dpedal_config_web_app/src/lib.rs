@@ -85,7 +85,7 @@ async fn open_device() {
             <input type="color" id="device_color">
 
             <div id="profiles-container"></div>
-            <button id="add-profile">Add Profile</button>
+            <button id="add-profile" style="margin-top:2em;">Add Profile</button>
             <button id="save">Save</button>
             <span id="save-result" style="font-size:1.5em;"></span>
             "#,
@@ -190,7 +190,7 @@ async fn write_config(
 
     for profile_section in ElementChildIter::new(&profiles_container) {
         let mut section_children = ElementChildIter::new(&profile_section);
-        section_children.next(); // skip h3
+        section_children.next(); // skip header_row
         let table = section_children.next().unwrap();
 
         let mut mappings = ArrayVec::new();
@@ -310,21 +310,27 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     profile_section
         .set_attribute("class", "profile-section")
         .unwrap();
+    profile_section
+        .dyn_ref::<HtmlElement>()
+        .unwrap()
+        .style()
+        .set_css_text("margin-top:3em;margin-bottom:0.5em");
 
     let header_row = document.create_element("div").unwrap();
     let header_row = header_row.dyn_ref::<HtmlElement>().unwrap();
     header_row
         .style()
-        .set_css_text("display:flex; align-items:center; gap:1em;");
+        .set_css_text("display:flex; align-items:center; gap:1em;margin-bottom:0.5em");
 
-    let heading = document.create_element("h3").unwrap();
+    let heading = document.create_element("h2").unwrap();
     let heading = heading.dyn_ref::<HtmlElement>().unwrap();
+    heading.style().set_css_text("margin:0;");
     heading.set_inner_text(&format!("Profile {index}"));
     header_row.append_child(heading).unwrap();
 
     let remove_button = document.create_element("button").unwrap();
     let remove_button = remove_button.dyn_ref::<HtmlElement>().unwrap();
-    remove_button.set_inner_text("Remove Profile");
+    remove_button.set_inner_text("Remove");
     let profile_section_clone = profile_section.clone();
     set_onclick(
         remove_button,
@@ -341,11 +347,13 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
 
     let table = document.create_element("table").unwrap();
     table.set_inner_html("<tr><th>Input</th><th>Output</th></tr>");
+    let table = table.dyn_ref::<HtmlElement>().unwrap();
+    table.style().set_css_text("margin:0;");
     for mapping in &profile.mappings {
         let row = create_row(document, mapping);
         table.append_child(&row).unwrap();
     }
-    profile_section.append_child(&table).unwrap();
+    profile_section.append_child(table).unwrap();
 
     profiles_container.append_child(&profile_section).unwrap();
 }
