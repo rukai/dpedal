@@ -13,7 +13,7 @@ use dpedal_config::PinRemapping;
 use dpedal_config::Profile;
 use dpedal_config::web_config_protocol::Request;
 use dpedal_config::web_config_protocol::Response;
-use element_iterator::ElementChildIterator;
+use element_iterator::ElementChildIter;
 use log::Level;
 use rkyv::rancor::Error;
 use std::rc::Rc;
@@ -116,7 +116,7 @@ async fn open_device() {
         Box::new(move || {
             let document = get_document();
             let container = document.get_element_by_id("profiles-container").unwrap();
-            let count = ElementChildIterator::new(&container).count();
+            let count = ElementChildIter::new(&container).count();
             if count < MAX_PROFILES {
                 gen_for_profile(&document, &Profile::default(), count);
                 update_add_profile_button(&document);
@@ -188,17 +188,17 @@ async fn write_config(
     let profiles_container = document.get_element_by_id("profiles-container").unwrap();
     let mut profiles = ArrayVec::new();
 
-    for profile_section in ElementChildIterator::new(&profiles_container) {
-        let mut section_children = ElementChildIterator::new(&profile_section);
+    for profile_section in ElementChildIter::new(&profiles_container) {
+        let mut section_children = ElementChildIter::new(&profile_section);
         section_children.next(); // skip h3
         let table = section_children.next().unwrap();
 
         let mut mappings = ArrayVec::new();
 
         // Iterate over rows, skipping the header
-        for row in ElementChildIterator::new(&table).skip(1) {
-            let mut cells = ElementChildIterator::new(&row);
-            let input_cell = ElementChildIterator::new(&cells.next().unwrap())
+        for row in ElementChildIter::new(&table).skip(1) {
+            let mut cells = ElementChildIter::new(&row);
+            let input_cell = ElementChildIter::new(&cells.next().unwrap())
                 .next()
                 .unwrap();
             let output = parse_output_cell(&cells.next().unwrap());
@@ -245,13 +245,13 @@ async fn write_config(
 }
 
 fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, 20> {
-    ElementChildIterator::new(output_cell)
+    ElementChildIter::new(output_cell)
         .flat_map(|span| parse_output_span(&span))
         .collect()
 }
 
 fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
-    let mut output_span = ElementChildIterator::new(output_span);
+    let mut output_span = ElementChildIter::new(output_span);
     let ty_value = output_span
         .next()?
         .dyn_ref::<HtmlSelectElement>()
@@ -268,7 +268,7 @@ fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
 
     match ty_value.as_str() {
         "mouse" => {
-            let field = ElementChildIterator::new(&sub_ty_fields_span)
+            let field = ElementChildIter::new(&sub_ty_fields_span)
                 .next()
                 .map(|x| x.dyn_ref::<HtmlInputElement>().unwrap().value())
                 .unwrap_or("".into());
@@ -278,7 +278,7 @@ fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
             .ok()
             .map(ComputerInput::Keyboard),
         "control" => {
-            let field = ElementChildIterator::new(&sub_ty_fields_span)
+            let field = ElementChildIter::new(&sub_ty_fields_span)
                 .next()
                 .map(|x| x.dyn_ref::<HtmlInputElement>().unwrap().value())
                 .unwrap_or("".into());
@@ -311,18 +311,16 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
         .set_attribute("class", "profile-section")
         .unwrap();
 
+    let header_row = document.create_element("div").unwrap();
+    let header_row = header_row.dyn_ref::<HtmlElement>().unwrap();
+    header_row
+        .style()
+        .set_css_text("display:flex; align-items:center; gap:1em;");
+
     let heading = document.create_element("h3").unwrap();
     let heading = heading.dyn_ref::<HtmlElement>().unwrap();
     heading.set_inner_text(&format!("Profile {index}"));
-    profile_section.append_child(heading).unwrap();
-
-    let table = document.create_element("table").unwrap();
-    table.set_inner_html("<tr><th>Input</th><th>Output</th></tr>");
-    for mapping in &profile.mappings {
-        let row = create_row(document, mapping);
-        table.append_child(&row).unwrap();
-    }
-    profile_section.append_child(&table).unwrap();
+    header_row.append_child(heading).unwrap();
 
     let remove_button = document.create_element("button").unwrap();
     let remove_button = remove_button.dyn_ref::<HtmlElement>().unwrap();
@@ -337,14 +335,24 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
             update_add_profile_button(&document);
         }) as Box<dyn FnMut()>,
     );
-    profile_section.append_child(remove_button).unwrap();
+    header_row.append_child(remove_button).unwrap();
+
+    profile_section.append_child(header_row).unwrap();
+
+    let table = document.create_element("table").unwrap();
+    table.set_inner_html("<tr><th>Input</th><th>Output</th></tr>");
+    for mapping in &profile.mappings {
+        let row = create_row(document, mapping);
+        table.append_child(&row).unwrap();
+    }
+    profile_section.append_child(&table).unwrap();
 
     profiles_container.append_child(&profile_section).unwrap();
 }
 
 fn update_add_profile_button(document: &Document) {
     let container = document.get_element_by_id("profiles-container").unwrap();
-    let count = ElementChildIterator::new(&container).count();
+    let count = ElementChildIter::new(&container).count();
     let add_button = document
         .get_element_by_id("add-profile")
         .unwrap()
@@ -514,7 +522,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     set_onchange(
         select_type,
         Box::new(move || {
-            let select_type = ElementChildIterator::new(&span).next().unwrap();
+            let select_type = ElementChildIter::new(&span).next().unwrap();
             let select_type = select_type.dyn_ref::<HtmlSelectElement>().unwrap();
             let output = match select_type.value().as_str() {
                 "mouse" => ComputerInput::Mouse(Default::default()),
@@ -595,8 +603,9 @@ fn set_onclick(element: &HtmlElement, closure: Box<dyn FnMut()>) {
 
 fn renumber_profiles(document: &Document) {
     let container = document.get_element_by_id("profiles-container").unwrap();
-    for (i, profile_section) in ElementChildIterator::new(&container).enumerate() {
-        let heading = ElementChildIterator::new(&profile_section)
+    for (i, profile_section) in ElementChildIter::new(&container).enumerate() {
+        let header_row = ElementChildIter::new(&profile_section).next().unwrap();
+        let heading = ElementChildIter::new(&header_row)
             .next()
             .unwrap()
             .dyn_into::<HtmlElement>()
