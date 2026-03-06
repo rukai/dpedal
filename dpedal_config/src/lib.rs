@@ -14,7 +14,7 @@ pub const CONFIG_SIZE: usize = 1024 * 16; // 16 KiB // TODO: This is used to all
 use arrayvec::{ArrayString, ArrayVec};
 use defmt::Format;
 use rkyv::{Archive, Deserialize, Serialize};
-use strum::{EnumIter, EnumString, IntoEnumIterator};
+use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 
 const fn assert_config_fits_in_flash() {
     // TODO: This isnt actually accurate, since the data will be serialized into rkyv format first.
@@ -172,7 +172,17 @@ pub enum ComputerInput {
 }
 
 #[derive(
-    Format, Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone, Copy, EnumIter,
+    Format,
+    Archive,
+    Deserialize,
+    Serialize,
+    Debug,
+    PartialEq,
+    Default,
+    Clone,
+    Copy,
+    EnumIter,
+    IntoStaticStr,
 )]
 #[rkyv(derive(Debug))]
 pub enum MouseInput {
@@ -765,7 +775,17 @@ const COMMON_KEYBOARD_INPUTS: [KeyboardInput; 93] = [
 ];
 
 #[derive(
-    Format, Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone, Copy, EnumIter,
+    Format,
+    Archive,
+    Deserialize,
+    Serialize,
+    Debug,
+    PartialEq,
+    Default,
+    Clone,
+    Copy,
+    EnumIter,
+    IntoStaticStr,
 )]
 #[rkyv(derive(Debug))]
 pub enum DPedalControl {
