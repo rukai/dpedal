@@ -83,12 +83,7 @@ async fn open_device() {
             <input type="text" id="device_name" style="font-size:2em;">
             <input type="color" id="device_color">
 
-            <table id="input-output-table">
-                <tr>
-                    <th>Input</th>
-                    <th>Output</th>
-                </tr>
-            </table>
+            <div id="profiles-container"></div>
             <button id="save">Save</button>
             <span id="save-result" style="font-size:1.5em;"></span>
             "#,
@@ -107,8 +102,8 @@ async fn open_device() {
     let color = color.dyn_ref::<HtmlInputElement>().unwrap();
     color.set_value(&format!("#{:0>6x}", config.color));
 
-    if let Some(profile) = config.profiles.first() {
-        gen_for_profile(&document, profile);
+    for (i, profile) in config.profiles.iter().enumerate() {
+        gen_for_profile(&document, profile, i);
     }
     log::info!("device config {:#?}", config);
 
@@ -173,22 +168,31 @@ async fn write_config(
     device: Rc<Device>,
     preserved: PreservedConfig,
 ) -> Result<(), String> {
-    let table = document.get_element_by_id("input-output-table").unwrap();
+    let profiles_container = document.get_element_by_id("profiles-container").unwrap();
+    let mut profiles = ArrayVec::new();
 
-    let mut mappings = ArrayVec::new();
+    for profile_section in ElementChildIterator::new(&profiles_container) {
+        let mut section_children = ElementChildIterator::new(&profile_section);
+        section_children.next(); // skip h3
+        let table = section_children.next().unwrap();
 
-    // Iterate over rows, skipping the header
-    for row in ElementChildIterator::new(&table).skip(1) {
-        let mut cells = ElementChildIterator::new(&row);
-        let input_cell = ElementChildIterator::new(&cells.next().unwrap())
-            .next()
-            .unwrap();
-        let output = parse_output_cell(&cells.next().unwrap());
+        let mut mappings = ArrayVec::new();
 
-        let input = input_cell.inner_html();
-        let input = ArrayVec::from_iter([DpedalInput::from_string(&input)
-            .ok_or_else(|| format!("{input} is not a valid input"))?]);
-        mappings.push(Mapping { input, output });
+        // Iterate over rows, skipping the header
+        for row in ElementChildIterator::new(&table).skip(1) {
+            let mut cells = ElementChildIterator::new(&row);
+            let input_cell = ElementChildIterator::new(&cells.next().unwrap())
+                .next()
+                .unwrap();
+            let output = parse_output_cell(&cells.next().unwrap());
+
+            let input = input_cell.inner_html();
+            let input = ArrayVec::from_iter([DpedalInput::from_string(&input)
+                .ok_or_else(|| format!("{input} is not a valid input"))?]);
+            mappings.push(Mapping { input, output });
+        }
+
+        profiles.push(Profile { mappings });
     }
 
     let name = document.get_element_by_id("device_name").unwrap();
@@ -204,13 +208,12 @@ async fn write_config(
     let color_element = color_element.dyn_ref::<HtmlInputElement>().unwrap();
     let color = u32::from_str_radix(color_element.value().strip_prefix("#").unwrap(), 16).unwrap();
 
-    // TODO: multi-profile support
     let config = Config {
         version: preserved.version,
         nickname,
         device: preserved.device,
         color,
-        profiles: ArrayVec::from_iter([Profile { mappings }]),
+        profiles,
         pin_remappings: preserved.pin_remappings,
     };
 
@@ -283,13 +286,28 @@ async fn request_get_config(device: &Device) -> Result<Config, String> {
     }
 }
 
-fn gen_for_profile(document: &Document, profile: &Profile) {
-    let table = document.get_element_by_id("input-output-table").unwrap();
+fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
+    let profiles_container = document.get_element_by_id("profiles-container").unwrap();
 
+    let profile_section = document.create_element("div").unwrap();
+    profile_section
+        .set_attribute("class", "profile-section")
+        .unwrap();
+
+    let heading = document.create_element("h3").unwrap();
+    let heading = heading.dyn_ref::<HtmlElement>().unwrap();
+    heading.set_inner_text(&format!("Profile {index}"));
+    profile_section.append_child(heading).unwrap();
+
+    let table = document.create_element("table").unwrap();
+    table.set_inner_html("<tr><th>Input</th><th>Output</th></tr>");
     for mapping in &profile.mappings {
         let row = create_row(document, mapping);
         table.append_child(&row).unwrap();
     }
+    profile_section.append_child(&table).unwrap();
+
+    profiles_container.append_child(&profile_section).unwrap();
 }
 
 pub fn set_error(document: &Document, error_message: &str) {
