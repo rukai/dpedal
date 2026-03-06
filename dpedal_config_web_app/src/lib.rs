@@ -198,14 +198,15 @@ async fn write_config(
         // Iterate over rows, skipping the header
         for row in ElementChildIter::new(&table).skip(1) {
             let mut cells = ElementChildIter::new(&row);
-            let input_cell = ElementChildIter::new(&cells.next().unwrap())
+
+            let input_select = ElementChildIter::new(&cells.next().unwrap())
                 .next()
                 .unwrap();
-            let output = parse_output_cell(&cells.next().unwrap());
+            let input_select = input_select.dyn_ref::<HtmlSelectElement>().unwrap();
+            let input_str = input_select.value();
+            let input = ArrayVec::from_iter([DpedalInput::from_string(&input_str).unwrap()]);
 
-            let input = input_cell.inner_html();
-            let input = ArrayVec::from_iter([DpedalInput::from_string(&input)
-                .ok_or_else(|| format!("{input} is not a valid input"))?]);
+            let output = parse_output_cell(&cells.next().unwrap());
             mappings.push(Mapping { input, output });
         }
 
@@ -394,18 +395,21 @@ fn create_row_input<const CAP: usize>(
     document: &Document,
     inputs: &ArrayVec<DpedalInput, CAP>,
 ) -> Element {
-    let input_value = inputs
-        .iter()
-        .map(|x| format!("{x:?}"))
-        .collect::<Vec<String>>()
-        .join("+");
-    let td1 = document.create_element("td").unwrap();
-
-    let input = document.create_element("p").unwrap();
-    let input = input.dyn_ref::<HtmlElement>().unwrap();
-    input.set_inner_text(&input_value);
-    td1.append_child(input).unwrap();
-    td1
+    let td = document.create_element("td").unwrap();
+    let select = document.create_element("select").unwrap();
+    let select = select.dyn_ref::<HtmlSelectElement>().unwrap();
+    let mut options = String::new();
+    for variant in DpedalInput::iter() {
+        let name: &str = (&variant).into();
+        options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
+    }
+    select.set_inner_html(&options);
+    select.style().set_css_text("font-size:2em;");
+    if let Some(input) = inputs.first() {
+        select.set_value(<&str>::from(input));
+    }
+    td.append_child(select).unwrap();
+    td
 }
 
 fn create_row_output<const CAP: usize>(

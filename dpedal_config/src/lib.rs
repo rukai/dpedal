@@ -73,6 +73,7 @@ pub struct PinRemapping {
 }
 
 pub const MAX_MAPPINGS: usize = 20;
+pub const MAX_DPEDAL_INPUTS: usize = 4;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Profile {
@@ -117,11 +118,23 @@ impl Default for Profile {
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Mapping {
-    pub input: ArrayVec<DpedalInput, 4>,
+    pub input: ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
     pub output: ArrayVec<ComputerInput, 20>,
 }
 
-#[derive(Format, Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone, Copy)]
+#[derive(
+    Format,
+    Archive,
+    Deserialize,
+    Serialize,
+    Debug,
+    PartialEq,
+    Default,
+    Clone,
+    Copy,
+    EnumIter,
+    IntoStaticStr,
+)]
 #[rkyv(derive(Debug))]
 pub enum DpedalInput {
     #[default]
