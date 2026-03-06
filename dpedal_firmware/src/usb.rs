@@ -30,10 +30,10 @@ pub async fn usb_builder(usb: Peri<'static, USB>) -> Builder<'static, Driver<'st
     let mut config = Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("Rukai");
     let product = PRODUCT_NAME.init(ArrayString::from("DPedal").unwrap());
-    let device_config = CONFIG.lock().await.clone().unwrap();
-    if !device_config.nickname.is_empty() {
+    let nickname = CONFIG.lock().await.as_ref().unwrap().nickname;
+    if !nickname.is_empty() {
         product.push_str(" - ");
-        product.push_str(&device_config.nickname);
+        product.push_str(&nickname);
     }
     match env!("PROFILE") {
         "release" => {}
