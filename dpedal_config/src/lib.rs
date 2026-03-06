@@ -114,14 +114,27 @@ impl Default for Profile {
     }
 }
 
+pub const MAX_DPEDAL_INPUTS: usize = 4;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Mapping {
-    pub input: ArrayVec<DpedalInput, 4>,
+    pub input: ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
     pub output: ArrayVec<ComputerInput, 20>,
 }
 
-#[derive(Format, Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone, Copy)]
+#[derive(
+    Format,
+    Archive,
+    Deserialize,
+    Serialize,
+    Debug,
+    PartialEq,
+    Default,
+    Clone,
+    Copy,
+    EnumIter,
+    IntoStaticStr,
+)]
 #[rkyv(derive(Debug))]
 pub enum DpedalInput {
     #[default]
