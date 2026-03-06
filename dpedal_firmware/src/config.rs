@@ -6,10 +6,11 @@ use embassy_rp::{
     flash::{Blocking, Flash},
     peripherals::FLASH,
 };
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, watch::Watch};
 use rkyv::{rancor::Failure, util::Align};
 
 pub static CONFIG: Mutex<CriticalSectionRawMutex, Option<Config>> = Mutex::new(None);
+pub static CONFIG_UPDATED: Watch<CriticalSectionRawMutex, (), 2> = Watch::new();
 
 pub struct ConfigFlash {
     flash: Flash<'static, FLASH, Blocking, PICO_FLASH_SIZE>,
@@ -29,6 +30,7 @@ impl ConfigFlash {
             *CONFIG.lock().await = Some(Config::default());
             error!("Failed to load config from flash")
         }
+        CONFIG_UPDATED.sender().send(());
     }
 
     async fn load_inner(&mut self) -> Result<(), ()> {
