@@ -31,6 +31,8 @@ const fn assert_config_size_fits_into_writable_flash_blocks() {
 const _: () = assert_config_fits_in_flash();
 const _: () = assert_config_size_fits_into_writable_flash_blocks();
 
+pub const MAX_PROFILES: usize = 5;
+
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Config {
@@ -38,7 +40,7 @@ pub struct Config {
     pub nickname: ArrayString<50>,
     pub device: Device,
     pub color: u32,
-    pub profiles: ArrayVec<Profile, 5>,
+    pub profiles: ArrayVec<Profile, MAX_PROFILES>,
     pub pin_remappings: ArrayVec<PinRemapping, 6>,
 }
 
@@ -49,46 +51,7 @@ impl Default for Config {
             nickname: ArrayString::from("my DPedal").unwrap(),
             device: Default::default(),
             color: 0x1790e3,
-            profiles: ArrayVec::from_iter([Profile {
-                mappings: ArrayVec::from_iter([
-                    Mapping {
-                        input: ArrayVec::from_iter([DpedalInput::DpadLeft]),
-                        output: ArrayVec::from_iter([ComputerInput::Mouse(
-                            MouseInput::ScrollLeft(10),
-                        )]),
-                    },
-                    Mapping {
-                        input: ArrayVec::from_iter([DpedalInput::DpadRight]),
-                        output: ArrayVec::from_iter([ComputerInput::Mouse(
-                            MouseInput::ScrollRight(10),
-                        )]),
-                    },
-                    Mapping {
-                        input: ArrayVec::from_iter([DpedalInput::DpadUp]),
-                        output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollUp(
-                            10,
-                        ))]),
-                    },
-                    Mapping {
-                        input: ArrayVec::from_iter([DpedalInput::DpadDown]),
-                        output: ArrayVec::from_iter([ComputerInput::Mouse(
-                            MouseInput::ScrollDown(10),
-                        )]),
-                    },
-                    Mapping {
-                        input: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
-                        output: ArrayVec::from_iter([ComputerInput::Keyboard(
-                            KeyboardInput::PageUp,
-                        )]),
-                    },
-                    Mapping {
-                        input: ArrayVec::from_iter([DpedalInput::ButtonRight]),
-                        output: ArrayVec::from_iter([ComputerInput::Keyboard(
-                            KeyboardInput::PageDown,
-                        )]),
-                    },
-                ]),
-            }]),
+            profiles: ArrayVec::from_iter([Profile::default()]),
             pin_remappings: Default::default(),
         }
     }
@@ -110,10 +73,45 @@ pub struct PinRemapping {
 }
 
 pub const MAX_MAPPINGS: usize = 20;
-#[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
+#[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Profile {
     pub mappings: ArrayVec<Mapping, MAX_MAPPINGS>,
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Self {
+            mappings: ArrayVec::from_iter([
+                Mapping {
+                    input: ArrayVec::from_iter([DpedalInput::DpadLeft]),
+                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollLeft(10))]),
+                },
+                Mapping {
+                    input: ArrayVec::from_iter([DpedalInput::DpadRight]),
+                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollRight(
+                        10,
+                    ))]),
+                },
+                Mapping {
+                    input: ArrayVec::from_iter([DpedalInput::DpadUp]),
+                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollUp(10))]),
+                },
+                Mapping {
+                    input: ArrayVec::from_iter([DpedalInput::DpadDown]),
+                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollDown(10))]),
+                },
+                Mapping {
+                    input: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
+                    output: ArrayVec::from_iter([ComputerInput::Keyboard(KeyboardInput::PageUp)]),
+                },
+                Mapping {
+                    input: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    output: ArrayVec::from_iter([ComputerInput::Keyboard(KeyboardInput::PageDown)]),
+                },
+            ]),
+        }
+    }
 }
 
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]

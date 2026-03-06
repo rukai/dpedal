@@ -6,6 +6,7 @@ use dpedal_config::DPedalControl;
 use dpedal_config::Device as DPedalDevice;
 use dpedal_config::DpedalInput;
 use dpedal_config::KeyboardInput;
+use dpedal_config::MAX_PROFILES;
 use dpedal_config::Mapping;
 use dpedal_config::MouseInput;
 use dpedal_config::PinRemapping;
@@ -84,6 +85,7 @@ async fn open_device() {
             <input type="color" id="device_color">
 
             <div id="profiles-container"></div>
+            <button id="add-profile">Add Profile</button>
             <button id="save">Save</button>
             <span id="save-result" style="font-size:1.5em;"></span>
             "#,
@@ -105,7 +107,22 @@ async fn open_device() {
     for (i, profile) in config.profiles.iter().enumerate() {
         gen_for_profile(&document, profile, i);
     }
+    update_profile_buttons(&document);
     log::info!("device config {:#?}", config);
+
+    set_button_on_click(
+        &document,
+        "add-profile",
+        Box::new(move || {
+            let document = get_document();
+            let container = document.get_element_by_id("profiles-container").unwrap();
+            let count = ElementChildIterator::new(&container).count();
+            if count < MAX_PROFILES {
+                gen_for_profile(&document, &Profile::default(), count);
+                update_profile_buttons(&document);
+            }
+        }) as Box<dyn FnMut()>,
+    );
 
     let preserved = PreservedConfig {
         version: config.version,
@@ -308,6 +325,21 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     profile_section.append_child(&table).unwrap();
 
     profiles_container.append_child(&profile_section).unwrap();
+}
+
+fn update_profile_buttons(document: &Document) {
+    let container = document.get_element_by_id("profiles-container").unwrap();
+    let count = ElementChildIterator::new(&container).count();
+    let add_button = document
+        .get_element_by_id("add-profile")
+        .unwrap()
+        .dyn_into::<HtmlElement>()
+        .unwrap();
+    if count < MAX_PROFILES {
+        add_button.remove_attribute("disabled").unwrap();
+    } else {
+        add_button.set_attribute("disabled", "").unwrap();
+    }
 }
 
 pub fn set_error(document: &Document, error_message: &str) {
