@@ -6,7 +6,10 @@ use dpedal_config::DPedalControl;
 use dpedal_config::Device as DPedalDevice;
 use dpedal_config::DpedalInput;
 use dpedal_config::KeyboardInput;
+use dpedal_config::MAX_COMPUTER_INPUTS;
 use dpedal_config::MAX_DPEDAL_INPUTS;
+use dpedal_config::MAX_NICKNAME_LEN;
+use dpedal_config::MAX_PIN_REMAPPINGS;
 use dpedal_config::MAX_PROFILES;
 use dpedal_config::Mapping;
 use dpedal_config::MouseInput;
@@ -218,7 +221,7 @@ async fn write_config(
     let name = name.dyn_ref::<HtmlInputElement>().unwrap();
     let nickname = ArrayString::from(&name.value()).map_err(|_| {
         format!(
-            "nickname must be <= 50 characters long, but was {} characters long",
+            "nickname must be <= {MAX_NICKNAME_LEN} characters long, but was {} characters long",
             name.value().len()
         )
     })?;
@@ -246,7 +249,7 @@ async fn write_config(
     Ok(())
 }
 
-fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, 20> {
+fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS> {
     ElementChildIter::new(output_cell)
         .flat_map(|span| parse_output_span(&span))
         .collect()
@@ -424,9 +427,9 @@ fn update_input_buttons(
     }
 }
 
-fn create_row_input<const CAP: usize>(
+fn create_row_input(
     document: &Document,
-    inputs: &ArrayVec<DpedalInput, CAP>,
+    inputs: &ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
 ) -> Element {
     let td = document.create_element("td").unwrap();
     td.dyn_ref::<HtmlElement>()
@@ -720,5 +723,5 @@ fn set_onchange(select: &HtmlElement, closure: Box<dyn FnMut()>) {
 struct PreservedConfig {
     version: u32,
     device: DPedalDevice,
-    pin_remappings: ArrayVec<PinRemapping, 6>,
+    pin_remappings: ArrayVec<PinRemapping, MAX_PIN_REMAPPINGS>,
 }

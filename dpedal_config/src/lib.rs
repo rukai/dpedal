@@ -32,16 +32,18 @@ const _: () = assert_config_fits_in_flash();
 const _: () = assert_config_size_fits_into_writable_flash_blocks();
 
 pub const MAX_PROFILES: usize = 5;
+pub const MAX_NICKNAME_LEN: usize = 50;
+pub const MAX_PIN_REMAPPINGS: usize = 6;
 
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Config {
     pub version: u32,
-    pub nickname: ArrayString<50>,
+    pub nickname: ArrayString<MAX_NICKNAME_LEN>,
     pub device: Device,
     pub color: u32,
     pub profiles: ArrayVec<Profile, MAX_PROFILES>,
-    pub pin_remappings: ArrayVec<PinRemapping, 6>,
+    pub pin_remappings: ArrayVec<PinRemapping, MAX_PIN_REMAPPINGS>,
 }
 
 impl Default for Config {
@@ -73,6 +75,7 @@ pub struct PinRemapping {
 }
 
 pub const MAX_MAPPINGS: usize = 20;
+pub const MAX_COMPUTER_INPUTS: usize = 20;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Profile {
@@ -119,7 +122,7 @@ pub const MAX_DPEDAL_INPUTS: usize = 4;
 #[rkyv(derive(Debug))]
 pub struct Mapping {
     pub input: ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
-    pub output: ArrayVec<ComputerInput, 20>,
+    pub output: ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS>,
 }
 
 #[derive(
