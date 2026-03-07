@@ -211,10 +211,13 @@ async fn write_config(
 
             let input_cell = cells.next().unwrap();
             let selects_container = ElementChildIter::new(&input_cell).nth(2).unwrap();
-            let input = ArrayVec::from_iter(
-                ElementChildIter::<HtmlSelectElement>::new(&selects_container)
-                    .map(|s| DpedalInput::from_string(&s.value()).unwrap()),
-            );
+            let input = ArrayVec::from_iter(ElementChildIter::new(&selects_container).map(
+                |wrapper: Element| {
+                    let s: HtmlSelectElement =
+                        wrapper.first_element_child().unwrap().dyn_into().unwrap();
+                    DpedalInput::from_string(&s.value()).unwrap()
+                },
+            ));
 
             let output = parse_output_cell(&cells.next().unwrap());
             mappings.push(Mapping { input, output });
@@ -348,6 +351,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     header_row.append_child(&remove_button).unwrap();
 
     let table: HtmlElement = document.create_element("table");
+    table.set_class_name("mapping-table");
     table.set_inner_html("<tr><th>Input</th><th>Output</th><th>Remove</th></tr>");
     table.style().set_css_text("margin:0;");
 
@@ -469,9 +473,12 @@ fn create_row_input(
     td.append_child(&buttons.remove).unwrap();
 
     let container: Element = document.create_element("div");
+    container.set_class_name("chord-container");
     for input in inputs {
         let select = create_dpedal_input_select(document, input);
-        container.append_child(&select).unwrap();
+        let wrapper: Element = document.create_element("span");
+        wrapper.append_child(&select).unwrap();
+        container.append_child(&wrapper).unwrap();
     }
     td.append_child(&container).unwrap();
 
@@ -479,7 +486,9 @@ fn create_row_input(
     buttons.setup_onclick(container, MAX_DPEDAL_INPUTS, || {
         let document = Document::get();
         let select = create_dpedal_input_select(&document, &DpedalInput::default());
-        select.into()
+        let wrapper: Element = document.create_element("span");
+        wrapper.append_child(&select).unwrap();
+        wrapper
     });
 
     td.into()
@@ -501,6 +510,7 @@ fn create_row_output(
     wrapper.append_child(&buttons.remove).unwrap();
 
     let container: Element = document.create_element("div");
+    container.set_class_name("sequence-container");
     for output in outputs {
         let span: Element = document.create_element("span");
         setup_single_output_span(&span, output);

@@ -133,6 +133,32 @@
             padding-right: 4.0em;
         }
 
+        .chord-container > :not(:first-child)::before {
+            content: "+";
+            font-size: 2em;
+            margin: 0 0.2em;
+        }
+
+        .sequence-container > :not(:first-child)::before {
+            content: "➜";
+            font-size: 2em;
+            margin: 0 0.2em;
+        }
+
+        .mapping-table th:nth-child(2) {
+            position: relative;
+        }
+
+        .mapping-table th:nth-child(2)::before {
+            content: "➜";
+            font-size: 3em;
+            line-height: 0;
+            position: absolute;
+            left: 0;
+            top: 40%;
+            transform: translateX(-50%);
+        }
+
         button {
             border-radius: 4px;
             border-style: solid;
