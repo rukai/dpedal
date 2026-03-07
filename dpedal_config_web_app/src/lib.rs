@@ -352,7 +352,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
 
     let table: HtmlElement = document.create_element("table");
     table.set_class_name("mapping-table");
-    table.set_inner_html("<tr><th>Input</th><th>Output</th><th>Remove</th></tr>");
+    table.set_inner_html("<tr><th style='font-size:1.5em'>Input</th><th style='font-size:1.5em'>Output</th><th style='font-size:1.5em'>Remove</th></tr>");
     table.style().set_css_text("margin:0;");
 
     let add_row_button: HtmlElement = document.create_element("button");
@@ -423,7 +423,8 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
     remove_td.style().set_css_text("text-align:center;");
     let remove_btn: HtmlElement = document.create_element("button");
     remove_btn.set_inner_text("✖");
-    remove_btn.style().set_css_text("color:red;font-size:2em;");
+    remove_btn.set_title("Remove Row");
+    remove_btn.set_class_name("remove-button");
     let tr_clone = tr.clone();
     set_onclick(
         &remove_btn,
@@ -464,23 +465,27 @@ fn create_row_input(
     document: &Document,
     inputs: &ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
 ) -> Element {
-    let td: HtmlElement = document.create_element("td");
-    td.style()
+    let td: Element = document.create_element("td");
+
+    let wrapper: HtmlElement = document.create_element("div");
+    wrapper
+        .style()
         .set_css_text("display:flex; align-items:flex-start;");
 
-    let buttons = AddRemoveButtons::new(document);
-    td.append_child(&buttons.add).unwrap();
-    td.append_child(&buttons.remove).unwrap();
+    let buttons = AddRemoveButtons::new(document, "Input");
+    wrapper.append_child(&buttons.add).unwrap();
+    wrapper.append_child(&buttons.remove).unwrap();
 
     let container: Element = document.create_element("div");
     container.set_class_name("chord-container");
     for input in inputs {
         let select = create_dpedal_input_select(document, input);
-        let wrapper: Element = document.create_element("span");
-        wrapper.append_child(&select).unwrap();
-        container.append_child(&wrapper).unwrap();
+        let inner_wrapper: Element = document.create_element("span");
+        inner_wrapper.append_child(&select).unwrap();
+        container.append_child(&inner_wrapper).unwrap();
     }
-    td.append_child(&container).unwrap();
+    wrapper.append_child(&container).unwrap();
+    td.append_child(&wrapper).unwrap();
 
     buttons.update(&container, MAX_DPEDAL_INPUTS);
     buttons.setup_onclick(container, MAX_DPEDAL_INPUTS, || {
@@ -491,7 +496,7 @@ fn create_row_input(
         wrapper
     });
 
-    td.into()
+    td
 }
 
 fn create_row_output(
@@ -505,7 +510,7 @@ fn create_row_output(
         .style()
         .set_css_text("display:flex; align-items:flex-start;");
 
-    let buttons = AddRemoveButtons::new(document);
+    let buttons = AddRemoveButtons::new(document, "Output");
     wrapper.append_child(&buttons.add).unwrap();
     wrapper.append_child(&buttons.remove).unwrap();
 
@@ -536,6 +541,8 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     let document = Document::get();
 
     clear_children(span);
+    let span_html: &HtmlElement = span.dyn_ref().unwrap();
+    span_html.style().set_css_text("white-space:nowrap;");
 
     // Add new children
     let select_type: HtmlSelectElement = document.create_element("select");
