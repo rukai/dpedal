@@ -133,31 +133,39 @@
             padding-right: 4.0em;
         }
 
-        .chord-container > :not(:first-child)::before {
-            content: "+";
-            font-size: 2em;
-            margin: 0 0.2em;
+        .chord-container,
+        .sequence-container {
+            display: flex;
+            flex-direction: column;
         }
 
-        .sequence-container > :not(:first-child)::before {
-            content: "➜";
-            font-size: 2em;
-            margin: 0 0.2em;
-        }
-
-        .mapping-table th:nth-child(2) {
+        .chord-container>*,
+        .sequence-container>* {
             position: relative;
         }
 
-        .mapping-table th:nth-child(2)::before {
-            content: "➜";
-            font-size: 3em;
-            line-height: 0;
-            position: absolute;
-            left: 0;
-            top: 40%;
-            transform: translateX(-50%);
+        .chord-container> :not(:first-child),
+        .sequence-container> :not(:first-child) {
+            margin-top: 4px;
         }
+
+        .chord-container> :not(:first-child)::before {
+            content: "+";
+            font-size: 2em;
+            font-weight: bold;
+            position: absolute;
+            right: 100%;
+            margin-right: 0.2em;
+        }
+
+        .sequence-container> :not(:first-child)::before {
+            content: "➜";
+            font-size: 2em;
+            position: absolute;
+            right: 100%;
+            margin-right: 0.2em;
+        }
+
 
         button {
             border-radius: 4px;
@@ -182,7 +190,7 @@
             color: white;
         }
 
-        .remove-button {
+        .red-button {
             background-color: #c95454;
             color: white;
         }
@@ -191,7 +199,7 @@
             background-color: #229313;
         }
 
-        .remove-button:hover {
+        .red-button:hover {
             background-color: #bc1717;
         }
 
@@ -201,9 +209,37 @@
             border-radius: 0.5em;
         }
 
+        /*
+         * Rounded-corner tables: border-collapse must be "separate" for border-radius to work on the table element.
+         * The table's own border draws the outer edge, so cell borders only draw internal grid lines (bottom + left).
+         * First-column and last-row cells have those internal borders removed to avoid doubling with the table border.
+         */
+        .profile-section table {
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 0.5em;
+            background-color: #DDDDDD;
+            width: 100%;
+            table-layout: fixed;
+        }
+
         .profile-section th,
         .profile-section td {
-            border-color: black;
+            border-style: solid;
+            border-color: #333333;
+            border-width: 0 0 3px 3px;
+            vertical-align: top;
+            padding: 4px;
+        }
+
+        /* Disable outer border */
+        .profile-section th:first-child,
+        .profile-section td:first-child {
+            border-left-width: 0;
+        }
+
+        .profile-section tr:last-child td {
+            border-bottom-width: 0;
         }
 
         input:invalid {
@@ -245,7 +281,7 @@
                 color: white;
             }
 
-            .remove-button {
+            .red-button {
                 background-color: #961212;
                 color: white;
             }
@@ -254,18 +290,21 @@
                 background-color: #5ab44f;
             }
 
-            .remove-button:hover {
+            .red-button:hover {
                 background-color: #c95454;
             }
 
             .profile-section {
                 background-color: #1a4a6b;
-                color: white;
+            }
+
+            .profile-section table {
+                background-color: #222222;
             }
 
             .profile-section th,
             .profile-section td {
-                border-color: #606060;
+                border-color: #b9b9b9;
             }
 
             input,
