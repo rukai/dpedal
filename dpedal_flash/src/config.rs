@@ -1,5 +1,8 @@
 use arrayvec::{ArrayString, ArrayVec};
-use dpedal_config::{ComputerInput, Config, DpedalInput, KeyboardInput, MAX_PROFILES, MouseInput};
+use dpedal_config::{
+    ComputerInput, Config, DpedalInput, KeyboardInput, MAX_COMPUTER_INPUTS, MAX_DPEDAL_INPUTS,
+    MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MouseInput,
+};
 use kdl::{KdlDocument, KdlNode};
 use kdl_config::{
     KdlConfig, KdlConfigFinalize, Parsed,
@@ -59,12 +62,12 @@ fn load_source(path: Option<PathBuf>) -> miette::Result<NamedSource<String>> {
 #[kdl_config_finalize_into = "dpedal_config::Config"]
 pub struct ConfigKdl {
     pub version: Parsed<u32>,
-    pub nickname: Parsed<ArrayString<50>>,
+    pub nickname: Parsed<ArrayString<MAX_NICKNAME_LEN>>,
     pub device: Parsed<DeviceKdl>,
     pub color: Parsed<u32>,
     pub profiles: Parsed<ArrayVec<Parsed<ProfileKdl>, MAX_PROFILES>>,
     // TODO: add validation: no duplicate pins (including default values), valid pin range
-    pub pin_remappings: Parsed<ArrayVec<Parsed<PinRemappingKdl>, 6>>,
+    pub pin_remappings: Parsed<ArrayVec<Parsed<PinRemappingKdl>, MAX_PIN_REMAPPINGS>>,
 }
 
 #[derive(KdlConfig, KdlConfigFinalize, Default, Debug)]
@@ -78,13 +81,13 @@ pub struct PinRemappingKdl {
 #[derive(KdlConfig, KdlConfigFinalize, Default, Debug)]
 #[kdl_config_finalize_into = "dpedal_config::Profile"]
 pub struct ProfileKdl {
-    pub mappings: Parsed<ArrayVec<Parsed<MappingKdl>, 20>>,
+    pub mappings: Parsed<ArrayVec<Parsed<MappingKdl>, MAX_MAPPINGS>>,
 }
 
 #[derive(Default, Debug)]
 pub struct MappingKdl {
-    pub input: ArrayVec<dpedal_config::DpedalInput, 4>,
-    pub output: ArrayVec<dpedal_config::ComputerInput, 20>,
+    pub input: ArrayVec<dpedal_config::DpedalInput, MAX_DPEDAL_INPUTS>,
+    pub output: ArrayVec<dpedal_config::ComputerInput, MAX_COMPUTER_INPUTS>,
 }
 
 impl KdlConfigFinalize for MappingKdl {
