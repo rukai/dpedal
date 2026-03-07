@@ -8,6 +8,7 @@ use dpedal_config::DpedalInput;
 use dpedal_config::KeyboardInput;
 use dpedal_config::MAX_COMPUTER_INPUTS;
 use dpedal_config::MAX_DPEDAL_INPUTS;
+use dpedal_config::MAX_MAPPINGS;
 use dpedal_config::MAX_NICKNAME_LEN;
 use dpedal_config::MAX_PIN_REMAPPINGS;
 use dpedal_config::MAX_PROFILES;
@@ -346,16 +347,37 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     );
     header_row.append_child(&remove_button).unwrap();
 
+    let table: HtmlElement = document.create_element("table");
+    table.set_inner_html("<tr><th>Input</th><th>Output</th><th>Remove</th></tr>");
+    table.style().set_css_text("margin:0;");
+
+    let add_row_button: HtmlElement = document.create_element("button");
+    add_row_button.set_inner_text("Add row");
+    add_row_button
+        .set_attribute("class", "add-row-button")
+        .unwrap();
+    let table_clone = table.clone();
+    let add_row_button_clone = add_row_button.clone();
+    set_onclick(
+        &add_row_button,
+        Box::new(move || {
+            let document = Document::get();
+            let row = create_row(&document, &Mapping::default());
+            table_clone.append_child(&row).unwrap();
+            update_add_row_button(&add_row_button_clone, &table_clone);
+        }) as Box<dyn FnMut()>,
+    );
+    header_row.append_child(&add_row_button).unwrap();
+
     profile_section.append_child(&header_row).unwrap();
 
-    let table: HtmlElement = document.create_element("table");
-    table.set_inner_html("<tr><th>Input</th><th>Output</th></tr>");
-    table.style().set_css_text("margin:0;");
     for mapping in &profile.mappings {
         let row = create_row(document, mapping);
         table.append_child(&row).unwrap();
     }
     profile_section.append_child(&table).unwrap();
+
+    update_add_row_button(&add_row_button, &table);
 
     profiles_container.append_child(&profile_section).unwrap();
 }
@@ -371,6 +393,15 @@ fn update_add_profile_button(document: &Document) {
     }
 }
 
+fn update_add_row_button(button: &HtmlElement, table: &HtmlElement) {
+    let row_count = table.children().length() as usize - 1; // subtract header
+    if row_count < MAX_MAPPINGS {
+        button.remove_attribute("disabled").unwrap();
+    } else {
+        button.set_attribute("disabled", "").unwrap();
+    }
+}
+
 pub fn set_error(document: &Document, error_message: &str) {
     let error: HtmlElement = document.get_element("error");
     error.set_inner_text(error_message);
@@ -383,6 +414,31 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
         .unwrap();
     tr.append_child(&create_row_output(document, &mapping.output))
         .unwrap();
+
+    let remove_td: HtmlElement = document.create_element("td");
+    remove_td.style().set_css_text("text-align:center;");
+    let remove_btn: HtmlElement = document.create_element("button");
+    remove_btn.set_inner_text("✖");
+    remove_btn.style().set_css_text("color:red;font-size:2em;");
+    let tr_clone = tr.clone();
+    set_onclick(
+        &remove_btn,
+        Box::new(move || {
+            let table = tr_clone.parent_element().unwrap();
+            let profile_section = table.parent_element().unwrap();
+            tr_clone.remove();
+            let table: HtmlElement = table.dyn_into().unwrap();
+            let add_row_btn = profile_section
+                .query_selector(".add-row-button")
+                .unwrap()
+                .unwrap()
+                .dyn_into::<HtmlElement>()
+                .unwrap();
+            update_add_row_button(&add_row_btn, &table);
+        }) as Box<dyn FnMut()>,
+    );
+    remove_td.append_child(&remove_btn).unwrap();
+    tr.append_child(&remove_td).unwrap();
 
     tr
 }
