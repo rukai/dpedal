@@ -11,14 +11,16 @@ pub(crate) struct AddRemoveButtons {
 }
 
 impl AddRemoveButtons {
-    pub fn new(document: &Document) -> Self {
+    pub fn new(document: &Document, kind: &str) -> Self {
         let add: HtmlElement = document.create_element("button");
         add.set_inner_text("✚");
-        add.style().set_css_text("color:green;font-size:2em;");
+        add.set_title(&format!("Add {kind}"));
+        add.set_class_name("add-button");
 
         let remove: HtmlElement = document.create_element("button");
         remove.set_inner_text("✖");
-        remove.style().set_css_text("color:red;font-size:2em;");
+        remove.set_title(&format!("Remove {kind}"));
+        remove.set_class_name("remove-button");
 
         AddRemoveButtons { add, remove }
     }
