@@ -31,11 +31,15 @@ use web_sys::HtmlElement;
 use web_sys::HtmlInputElement;
 use web_sys::HtmlSelectElement;
 
+use crate::add_remove_buttons::AddRemoveButtons;
 use crate::device::Device;
 use crate::document::Document;
+use crate::dom_helpers::{clear_children, set_button_on_click, set_onchange, set_onclick};
 
+mod add_remove_buttons;
 mod device;
 mod document;
+mod dom_helpers;
 mod element_iterator;
 
 #[wasm_bindgen]
@@ -396,24 +400,6 @@ fn create_dpedal_input_select(document: &Document, value: &DpedalInput) -> HtmlS
     select
 }
 
-fn update_input_buttons(
-    container: &Element,
-    add_button: &HtmlElement,
-    remove_button: &HtmlElement,
-) {
-    let count = container.children().length();
-    if count >= MAX_DPEDAL_INPUTS as u32 {
-        add_button.set_attribute("disabled", "").unwrap();
-    } else {
-        add_button.remove_attribute("disabled").unwrap();
-    }
-    if count == 0 {
-        remove_button.set_attribute("disabled", "").unwrap();
-    } else {
-        remove_button.remove_attribute("disabled").unwrap();
-    }
-}
-
 fn create_row_input(
     document: &Document,
     inputs: &ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
@@ -422,19 +408,9 @@ fn create_row_input(
     td.style()
         .set_css_text("display:flex; align-items:flex-start;");
 
-    let add_button: HtmlElement = document.create_element("button");
-    add_button.set_inner_text("✚");
-    add_button
-        .style()
-        .set_css_text("color:green;font-size:2em;");
-    td.append_child(&add_button).unwrap();
-
-    let remove_button: HtmlElement = document.create_element("button");
-    remove_button.set_inner_text("✖");
-    remove_button
-        .style()
-        .set_css_text("color:red;font-size:2em;");
-    td.append_child(&remove_button).unwrap();
+    let buttons = AddRemoveButtons::new(document);
+    td.append_child(&buttons.add).unwrap();
+    td.append_child(&buttons.remove).unwrap();
 
     let container: Element = document.create_element("div");
     for input in inputs {
@@ -443,57 +419,14 @@ fn create_row_input(
     }
     td.append_child(&container).unwrap();
 
-    update_input_buttons(&container, &add_button, &remove_button);
-
-    {
-        let container = container.clone();
-        let add_button_clone = add_button.clone();
-        let remove_button_clone = remove_button.clone();
-        set_onclick(
-            &add_button,
-            Box::new(move || {
-                let document = Document::get();
-                let select = create_dpedal_input_select(&document, &DpedalInput::default());
-                container.append_child(&select).unwrap();
-                update_input_buttons(&container, &add_button_clone, &remove_button_clone);
-            }) as Box<dyn FnMut()>,
-        );
-    }
-
-    {
-        let container = container.clone();
-        let add_button_clone = add_button.clone();
-        let remove_button_clone = remove_button.clone();
-        set_onclick(
-            &remove_button,
-            Box::new(move || {
-                if let Some(last) = container.last_element_child() {
-                    last.remove();
-                }
-                update_input_buttons(&container, &add_button_clone, &remove_button_clone);
-            }) as Box<dyn FnMut()>,
-        );
-    }
+    buttons.update(&container, MAX_DPEDAL_INPUTS);
+    buttons.setup_onclick(container, MAX_DPEDAL_INPUTS, || {
+        let document = Document::get();
+        let select = create_dpedal_input_select(&document, &DpedalInput::default());
+        select.into()
+    });
 
     td.into()
-}
-
-fn update_output_buttons(
-    container: &Element,
-    add_button: &HtmlElement,
-    remove_button: &HtmlElement,
-) {
-    let count = container.children().length();
-    if count >= MAX_COMPUTER_INPUTS as u32 {
-        add_button.set_attribute("disabled", "").unwrap();
-    } else {
-        add_button.remove_attribute("disabled").unwrap();
-    }
-    if count == 0 {
-        remove_button.set_attribute("disabled", "").unwrap();
-    } else {
-        remove_button.remove_attribute("disabled").unwrap();
-    }
 }
 
 fn create_row_output(
@@ -507,19 +440,9 @@ fn create_row_output(
         .style()
         .set_css_text("display:flex; align-items:flex-start;");
 
-    let add_button: HtmlElement = document.create_element("button");
-    add_button.set_inner_text("✚");
-    add_button
-        .style()
-        .set_css_text("color:green;font-size:2em;");
-    wrapper.append_child(&add_button).unwrap();
-
-    let remove_button: HtmlElement = document.create_element("button");
-    remove_button.set_inner_text("✖");
-    remove_button
-        .style()
-        .set_css_text("color:red;font-size:2em;");
-    wrapper.append_child(&remove_button).unwrap();
+    let buttons = AddRemoveButtons::new(document);
+    wrapper.append_child(&buttons.add).unwrap();
+    wrapper.append_child(&buttons.remove).unwrap();
 
     let container: Element = document.create_element("div");
     for output in outputs {
@@ -530,38 +453,13 @@ fn create_row_output(
     wrapper.append_child(&container).unwrap();
     td.append_child(&wrapper).unwrap();
 
-    update_output_buttons(&container, &add_button, &remove_button);
-
-    {
-        let container = container.clone();
-        let add_button_clone = add_button.clone();
-        let remove_button_clone = remove_button.clone();
-        set_onclick(
-            &add_button,
-            Box::new(move || {
-                let document = Document::get();
-                let span: Element = document.create_element("span");
-                setup_single_output_span(&span, &ComputerInput::Keyboard(Default::default()));
-                container.append_child(&span).unwrap();
-                update_output_buttons(&container, &add_button_clone, &remove_button_clone);
-            }) as Box<dyn FnMut()>,
-        );
-    }
-
-    {
-        let container = container.clone();
-        let add_button_clone = add_button.clone();
-        let remove_button_clone = remove_button.clone();
-        set_onclick(
-            &remove_button,
-            Box::new(move || {
-                if let Some(last) = container.last_element_child() {
-                    last.remove();
-                }
-                update_output_buttons(&container, &add_button_clone, &remove_button_clone);
-            }) as Box<dyn FnMut()>,
-        );
-    }
+    buttons.update(&container, MAX_COMPUTER_INPUTS);
+    buttons.setup_onclick(container, MAX_COMPUTER_INPUTS, || {
+        let document = Document::get();
+        let span: Element = document.create_element("span");
+        setup_single_output_span(&span, &ComputerInput::Keyboard(Default::default()));
+        span
+    });
 
     td
 }
@@ -723,25 +621,6 @@ fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
     }
 }
 
-fn clear_children(el: &Element) {
-    while let Some(child) = el.first_element_child() {
-        child.remove();
-    }
-}
-
-fn set_button_on_click(document: &Document, id: &str, closure: Box<dyn FnMut()>) {
-    let button: HtmlElement = document.get_element(id);
-    set_onclick(&button, closure);
-}
-
-fn set_onclick(element: &HtmlElement, closure: Box<dyn FnMut()>) {
-    let closure = Closure::wrap(closure);
-    element.set_onclick(Some(closure.as_ref().unchecked_ref()));
-
-    // Need to forget closure otherwise the destructor destroys it ;-;
-    closure.forget();
-}
-
 fn renumber_profiles(document: &Document) {
     let container: Element = document.get_element("profiles-container");
     for (i, profile_section) in ElementChildIter::new(&container).enumerate() {
@@ -751,14 +630,6 @@ fn renumber_profiles(document: &Document) {
             .unwrap();
         heading.set_inner_text(&format!("Profile {i}"));
     }
-}
-
-fn set_onchange(select: &HtmlElement, closure: Box<dyn FnMut()>) {
-    let closure = Closure::wrap(closure);
-    select.set_onchange(Some(closure.as_ref().unchecked_ref()));
-
-    // Need to forget closure otherwise the destructor destroys it ;-;
-    closure.forget();
 }
 
 /// The fields from the device's config that are not editable via the UI and must be
