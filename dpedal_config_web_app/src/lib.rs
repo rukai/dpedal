@@ -26,21 +26,24 @@ use strum::IntoEnumIterator;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
+use web_sys::Element;
 use web_sys::HtmlElement;
 use web_sys::HtmlInputElement;
 use web_sys::HtmlSelectElement;
-use web_sys::{Document, Element};
 
 use crate::device::Device;
+use crate::document::Document;
 
 mod device;
+mod document;
 mod element_iterator;
+
 #[wasm_bindgen]
 pub fn run() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(Level::Info).expect("could not initialize logger");
 
-    let document = get_document();
+    let document = Document::get();
     set_button_on_click(
         &document,
         "open-device",
@@ -52,7 +55,7 @@ pub fn run() {
 
 /// Opens a webusb device, creating (or replacing the existing) #mapping-section with UI for configuring the device
 async fn open_device() {
-    let document = get_document();
+    let document = Document::get();
     set_error(&document, "");
 
     let device = match Device::new().await {
@@ -76,9 +79,10 @@ async fn open_device() {
     };
 
     let config_div = document
+        .0
         .get_element_by_id("mapping-section")
         .unwrap_or_else(|| {
-            let config_div = document.create_element("div").unwrap();
+            let config_div: Element = document.create_element("div");
             config_div.set_id("mapping-section");
             config_div
         });
@@ -95,17 +99,15 @@ async fn open_device() {
             "#,
     );
 
-    let config_div = config_div.dyn_ref::<HtmlElement>().unwrap();
+    let config_div: HtmlElement = config_div.dyn_into().unwrap();
 
-    let app_div = document.get_element_by_id("config-app").unwrap();
-    app_div.append_child(config_div).unwrap();
+    let app_div: Element = document.get_element("config-app");
+    app_div.append_child(&config_div).unwrap();
 
-    let name = document.get_element_by_id("device_name").unwrap();
-    let name = name.dyn_ref::<HtmlInputElement>().unwrap();
+    let name: HtmlInputElement = document.get_element("device_name");
     name.set_value(config.nickname.as_ref());
 
-    let color = document.get_element_by_id("device_color").unwrap();
-    let color = color.dyn_ref::<HtmlInputElement>().unwrap();
+    let color: HtmlInputElement = document.get_element("device_color");
     color.set_value(&format!("#{:0>6x}", config.color));
 
     for (i, profile) in config.profiles.iter().enumerate() {
@@ -118,9 +120,9 @@ async fn open_device() {
         &document,
         "add-profile",
         Box::new(move || {
-            let document = get_document();
-            let container = document.get_element_by_id("profiles-container").unwrap();
-            let count = ElementChildIter::new(&container).count();
+            let document = Document::get();
+            let container: Element = document.get_element("profiles-container");
+            let count = container.children().length() as usize;
             if count < MAX_PROFILES {
                 gen_for_profile(&document, &Profile::default(), count);
                 update_add_profile_button(&document);
@@ -160,9 +162,8 @@ async fn sleep(millis: i32) {
 }
 
 async fn write_config_task(device: Rc<Device>, preserved: PreservedConfig) {
-    let document = get_document();
-    let save_result = document.get_element_by_id("save-result").unwrap();
-    let save_result = save_result.dyn_ref::<HtmlElement>().unwrap();
+    let document = Document::get();
+    let save_result: HtmlElement = document.get_element("save-result");
     save_result.set_inner_html("🌀");
 
     if let Err(err) = write_config(&document, device, preserved).await {
@@ -189,7 +190,7 @@ async fn write_config(
     device: Rc<Device>,
     preserved: PreservedConfig,
 ) -> Result<(), String> {
-    let profiles_container = document.get_element_by_id("profiles-container").unwrap();
+    let profiles_container: Element = document.get_element("profiles-container");
     let mut profiles = ArrayVec::new();
 
     for profile_section in ElementChildIter::new(&profiles_container) {
@@ -205,10 +206,10 @@ async fn write_config(
 
             let input_cell = cells.next().unwrap();
             let selects_container = ElementChildIter::new(&input_cell).nth(2).unwrap();
-            let input = ArrayVec::from_iter(ElementChildIter::new(&selects_container).map(|el| {
-                let s = el.dyn_ref::<HtmlSelectElement>().unwrap();
-                DpedalInput::from_string(&s.value()).unwrap()
-            }));
+            let input = ArrayVec::from_iter(
+                ElementChildIter::<HtmlSelectElement>::new(&selects_container)
+                    .map(|s| DpedalInput::from_string(&s.value()).unwrap()),
+            );
 
             let output = parse_output_cell(&cells.next().unwrap());
             mappings.push(Mapping { input, output });
@@ -217,8 +218,7 @@ async fn write_config(
         profiles.push(Profile { mappings });
     }
 
-    let name = document.get_element_by_id("device_name").unwrap();
-    let name = name.dyn_ref::<HtmlInputElement>().unwrap();
+    let name: HtmlInputElement = document.get_element("device_name");
     let nickname = ArrayString::from(&name.value()).map_err(|_| {
         format!(
             "nickname must be <= {MAX_NICKNAME_LEN} characters long, but was {} characters long",
@@ -226,8 +226,7 @@ async fn write_config(
         )
     })?;
 
-    let color_element = document.get_element_by_id("device_color").unwrap();
-    let color_element = color_element.dyn_ref::<HtmlInputElement>().unwrap();
+    let color_element: HtmlInputElement = document.get_element("device_color");
     let color = u32::from_str_radix(color_element.value().strip_prefix("#").unwrap(), 16).unwrap();
 
     let config = Config {
@@ -256,26 +255,24 @@ fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, MAX_COMPU
 }
 
 fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
-    let mut output_span = ElementChildIter::new(output_span);
-    let ty_value = output_span
-        .next()?
-        .dyn_ref::<HtmlSelectElement>()
+    let children = output_span.children();
+    let ty_value = children
+        .item(0)?
+        .dyn_into::<HtmlSelectElement>()
         .unwrap()
         .value();
-
-    let sub_ty_value = output_span
-        .next()?
-        .dyn_ref::<HtmlSelectElement>()
+    let sub_ty_value = children
+        .item(1)?
+        .dyn_into::<HtmlSelectElement>()
         .unwrap()
         .value();
-
-    let sub_ty_fields_span = output_span.next()?;
+    let sub_ty_fields_span = children.item(2)?;
 
     match ty_value.as_str() {
         "mouse" => {
-            let field = ElementChildIter::new(&sub_ty_fields_span)
+            let field = ElementChildIter::<HtmlInputElement>::new(&sub_ty_fields_span)
                 .next()
-                .map(|x| x.dyn_ref::<HtmlInputElement>().unwrap().value())
+                .map(|x| x.value())
                 .unwrap_or("".into());
             MouseInput::from_string(&sub_ty_value, &field).map(ComputerInput::Mouse)
         }
@@ -283,9 +280,9 @@ fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
             .ok()
             .map(ComputerInput::Keyboard),
         "control" => {
-            let field = ElementChildIter::new(&sub_ty_fields_span)
+            let field = ElementChildIter::<HtmlInputElement>::new(&sub_ty_fields_span)
                 .next()
-                .map(|x| x.dyn_ref::<HtmlInputElement>().unwrap().value())
+                .map(|x| x.value())
                 .unwrap_or("".into());
             DPedalControl::from_string(&sub_ty_value, &field).map(ComputerInput::Control)
         }
@@ -309,68 +306,58 @@ async fn request_get_config(device: &Device) -> Result<Config, String> {
 }
 
 fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
-    let profiles_container = document.get_element_by_id("profiles-container").unwrap();
+    let profiles_container: Element = document.get_element("profiles-container");
 
-    let profile_section = document.create_element("div").unwrap();
+    let profile_section: HtmlElement = document.create_element("div");
     profile_section
         .set_attribute("class", "profile-section")
         .unwrap();
     profile_section
-        .dyn_ref::<HtmlElement>()
-        .unwrap()
         .style()
         .set_css_text("margin-top:3em;margin-bottom:0.5em");
 
-    let header_row = document.create_element("div").unwrap();
-    let header_row = header_row.dyn_ref::<HtmlElement>().unwrap();
+    let header_row: HtmlElement = document.create_element("div");
     header_row
         .style()
         .set_css_text("display:flex; align-items:center; gap:1em;margin-bottom:0.5em");
 
-    let heading = document.create_element("h2").unwrap();
-    let heading = heading.dyn_ref::<HtmlElement>().unwrap();
+    let heading: HtmlElement = document.create_element("h2");
     heading.style().set_css_text("margin:0;");
     heading.set_inner_text(&format!("Profile {index}"));
-    header_row.append_child(heading).unwrap();
+    header_row.append_child(&heading).unwrap();
 
-    let remove_button = document.create_element("button").unwrap();
-    let remove_button = remove_button.dyn_ref::<HtmlElement>().unwrap();
+    let remove_button: HtmlElement = document.create_element("button");
     remove_button.set_inner_text("Remove");
     let profile_section_clone = profile_section.clone();
     set_onclick(
-        remove_button,
+        &remove_button,
         Box::new(move || {
             profile_section_clone.remove();
-            let document = get_document();
+            let document = Document::get();
             renumber_profiles(&document);
             update_add_profile_button(&document);
         }) as Box<dyn FnMut()>,
     );
-    header_row.append_child(remove_button).unwrap();
+    header_row.append_child(&remove_button).unwrap();
 
-    profile_section.append_child(header_row).unwrap();
+    profile_section.append_child(&header_row).unwrap();
 
-    let table = document.create_element("table").unwrap();
+    let table: HtmlElement = document.create_element("table");
     table.set_inner_html("<tr><th>Input</th><th>Output</th></tr>");
-    let table = table.dyn_ref::<HtmlElement>().unwrap();
     table.style().set_css_text("margin:0;");
     for mapping in &profile.mappings {
         let row = create_row(document, mapping);
         table.append_child(&row).unwrap();
     }
-    profile_section.append_child(table).unwrap();
+    profile_section.append_child(&table).unwrap();
 
     profiles_container.append_child(&profile_section).unwrap();
 }
 
 fn update_add_profile_button(document: &Document) {
-    let container = document.get_element_by_id("profiles-container").unwrap();
-    let count = ElementChildIter::new(&container).count();
-    let add_button = document
-        .get_element_by_id("add-profile")
-        .unwrap()
-        .dyn_into::<HtmlElement>()
-        .unwrap();
+    let container: Element = document.get_element("profiles-container");
+    let count = container.children().length() as usize;
+    let add_button: HtmlElement = document.get_element("add-profile");
     if count < MAX_PROFILES {
         add_button.remove_attribute("disabled").unwrap();
     } else {
@@ -379,13 +366,12 @@ fn update_add_profile_button(document: &Document) {
 }
 
 pub fn set_error(document: &Document, error_message: &str) {
-    let error = document.get_element_by_id("error").unwrap();
-    let error = error.dyn_ref::<HtmlElement>().unwrap();
+    let error: HtmlElement = document.get_element("error");
     error.set_inner_text(error_message);
 }
 
 fn create_row(document: &Document, mapping: &Mapping) -> Element {
-    let tr = document.create_element("tr").unwrap();
+    let tr: Element = document.create_element("tr");
 
     tr.append_child(&create_row_input(document, &mapping.input))
         .unwrap();
@@ -396,8 +382,7 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
 }
 
 fn create_dpedal_input_select(document: &Document, value: &DpedalInput) -> HtmlSelectElement {
-    let select = document.create_element("select").unwrap();
-    let select = select.dyn_into::<HtmlSelectElement>().unwrap();
+    let select: HtmlSelectElement = document.create_element("select");
     let mut options = String::new();
     for variant in DpedalInput::iter() {
         let name: &str = (&variant).into();
@@ -431,29 +416,25 @@ fn create_row_input(
     document: &Document,
     inputs: &ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
 ) -> Element {
-    let td = document.create_element("td").unwrap();
-    td.dyn_ref::<HtmlElement>()
-        .unwrap()
-        .style()
+    let td: HtmlElement = document.create_element("td");
+    td.style()
         .set_css_text("display:flex; align-items:flex-start;");
 
-    let add_button = document.create_element("button").unwrap();
-    let add_button = add_button.dyn_into::<HtmlElement>().unwrap();
+    let add_button: HtmlElement = document.create_element("button");
     add_button.set_inner_text("✚");
     add_button
         .style()
         .set_css_text("color:green;font-size:2em;");
     td.append_child(&add_button).unwrap();
 
-    let remove_button = document.create_element("button").unwrap();
-    let remove_button = remove_button.dyn_into::<HtmlElement>().unwrap();
+    let remove_button: HtmlElement = document.create_element("button");
     remove_button.set_inner_text("✖");
     remove_button
         .style()
         .set_css_text("color:red;font-size:2em;");
     td.append_child(&remove_button).unwrap();
 
-    let container = document.create_element("div").unwrap();
+    let container: Element = document.create_element("div");
     for input in inputs {
         let select = create_dpedal_input_select(document, input);
         container.append_child(&select).unwrap();
@@ -463,13 +444,13 @@ fn create_row_input(
     update_input_buttons(&container, &add_button, &remove_button);
 
     {
-        let document = document.clone();
         let container = container.clone();
         let add_button_clone = add_button.clone();
         let remove_button_clone = remove_button.clone();
         set_onclick(
             &add_button,
             Box::new(move || {
+                let document = Document::get();
                 let select = create_dpedal_input_select(&document, &DpedalInput::default());
                 container.append_child(&select).unwrap();
                 update_input_buttons(&container, &add_button_clone, &remove_button_clone);
@@ -492,15 +473,15 @@ fn create_row_input(
         );
     }
 
-    td
+    td.into()
 }
 
 fn create_row_output<const CAP: usize>(
     document: &Document,
     outputs: &ArrayVec<ComputerInput, CAP>,
 ) -> Element {
-    let td = document.create_element("td").unwrap();
-    let span = document.create_element("span").unwrap();
+    let td: Element = document.create_element("td");
+    let span: Element = document.create_element("span");
     td.append_child(&span).unwrap();
 
     for output in outputs {
@@ -513,13 +494,12 @@ fn create_row_output<const CAP: usize>(
 /// Create or recreate a single output span.
 /// The output cell of the mapping table can contain many of these spans, each corresponding to a distinct output or step in a dpedal macro.
 fn setup_single_output_span(span: &Element, output: &ComputerInput) {
-    let document = get_document();
+    let document = Document::get();
 
     clear_children(span);
 
     // Add new children
-    let select_type = document.create_element("select").unwrap();
-    let select_type = select_type.dyn_ref::<HtmlSelectElement>().unwrap();
+    let select_type: HtmlSelectElement = document.create_element("select");
     select_type.set_inner_html(
         "
 <option value=\"keyboard\">⌨️</option>
@@ -536,14 +516,13 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
         ComputerInput::Keyboard(_) => "keyboard",
         ComputerInput::Control(_) => "control",
     });
-    span.append_child(select_type).unwrap();
+    span.append_child(&select_type).unwrap();
 
-    let select_subtype = document.create_element("select").unwrap();
-    let select_subtype = select_subtype.dyn_ref::<HtmlSelectElement>().unwrap();
+    let select_subtype: HtmlSelectElement = document.create_element("select");
     select_subtype.style().set_css_text("font-size:2em;");
-    span.append_child(select_subtype).unwrap();
+    span.append_child(&select_subtype).unwrap();
 
-    let subtype_fields_span = document.create_element("span").unwrap();
+    let subtype_fields_span: Element = document.create_element("span");
 
     match output {
         ComputerInput::None => {}
@@ -560,7 +539,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
             let select_subtype_clone = select_subtype.clone();
             let subtype_fields_span = subtype_fields_span.clone();
             set_onchange(
-                select_subtype,
+                &select_subtype,
                 Box::new(move || {
                     // Create a default for the selected MouseInput
                     let mouse_input =
@@ -601,7 +580,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
             let select_subtype_clone = select_subtype.clone();
             let subtype_fields_span = subtype_fields_span.clone();
             set_onchange(
-                select_subtype,
+                &select_subtype,
                 Box::new(move || {
                     // Create a default for the selected DPedalControl
                     let control =
@@ -615,10 +594,11 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
 
     let span = span.clone();
     set_onchange(
-        select_type,
+        &select_type,
         Box::new(move || {
-            let select_type = ElementChildIter::new(&span).next().unwrap();
-            let select_type = select_type.dyn_ref::<HtmlSelectElement>().unwrap();
+            let select_type = ElementChildIter::<HtmlSelectElement>::new(&span)
+                .next()
+                .unwrap();
             let output = match select_type.value().as_str() {
                 "mouse" => ComputerInput::Mouse(Default::default()),
                 "keyboard" => ComputerInput::Keyboard(Default::default()),
@@ -656,16 +636,15 @@ fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
 fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
     clear_children(span);
     if let Some(x) = value {
-        let document = get_document();
-        let input_field = document.create_element("input").unwrap();
-        let input_field = input_field.dyn_ref::<HtmlInputElement>().unwrap();
+        let document = Document::get();
+        let input_field: HtmlInputElement = document.create_element("input");
         input_field.set_type("number");
         input_field.set_value(&x.to_string());
         input_field.style().set_css_text("font-size:2em;");
         input_field.set_min("0");
         input_field.set_max("1000");
         input_field.set_required(true);
-        span.append_child(input_field).unwrap();
+        span.append_child(&input_field).unwrap();
     }
 }
 
@@ -675,16 +654,8 @@ fn clear_children(el: &Element) {
     }
 }
 
-fn get_document() -> web_sys::Document {
-    web_sys::window().unwrap().document().unwrap()
-}
-
 fn set_button_on_click(document: &Document, id: &str, closure: Box<dyn FnMut()>) {
-    let button = document
-        .get_element_by_id(id)
-        .unwrap()
-        .dyn_into::<HtmlElement>()
-        .unwrap();
+    let button: HtmlElement = document.get_element(id);
     set_onclick(&button, closure);
 }
 
@@ -697,13 +668,11 @@ fn set_onclick(element: &HtmlElement, closure: Box<dyn FnMut()>) {
 }
 
 fn renumber_profiles(document: &Document) {
-    let container = document.get_element_by_id("profiles-container").unwrap();
+    let container: Element = document.get_element("profiles-container");
     for (i, profile_section) in ElementChildIter::new(&container).enumerate() {
         let header_row = ElementChildIter::new(&profile_section).next().unwrap();
-        let heading = ElementChildIter::new(&header_row)
+        let heading = ElementChildIter::<HtmlElement>::new(&header_row)
             .next()
-            .unwrap()
-            .dyn_into::<HtmlElement>()
             .unwrap();
         heading.set_inner_text(&format!("Profile {i}"));
     }
