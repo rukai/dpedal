@@ -249,7 +249,9 @@ async fn write_config(
 }
 
 fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS> {
-    ElementChildIter::new(output_cell)
+    let wrapper = output_cell.children().item(0).unwrap();
+    let container = wrapper.children().item(2).unwrap();
+    ElementChildIter::new(&container)
         .flat_map(|span| parse_output_span(&span))
         .collect()
 }
@@ -476,16 +478,89 @@ fn create_row_input(
     td.into()
 }
 
-fn create_row_output<const CAP: usize>(
+fn update_output_buttons(
+    container: &Element,
+    add_button: &HtmlElement,
+    remove_button: &HtmlElement,
+) {
+    let count = container.children().length();
+    if count >= MAX_COMPUTER_INPUTS as u32 {
+        add_button.set_attribute("disabled", "").unwrap();
+    } else {
+        add_button.remove_attribute("disabled").unwrap();
+    }
+    if count == 0 {
+        remove_button.set_attribute("disabled", "").unwrap();
+    } else {
+        remove_button.remove_attribute("disabled").unwrap();
+    }
+}
+
+fn create_row_output(
     document: &Document,
-    outputs: &ArrayVec<ComputerInput, CAP>,
+    outputs: &ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS>,
 ) -> Element {
     let td: Element = document.create_element("td");
-    let span: Element = document.create_element("span");
-    td.append_child(&span).unwrap();
 
+    let wrapper: HtmlElement = document.create_element("div");
+    wrapper
+        .style()
+        .set_css_text("display:flex; align-items:flex-start;");
+
+    let add_button: HtmlElement = document.create_element("button");
+    add_button.set_inner_text("✚");
+    add_button
+        .style()
+        .set_css_text("color:green;font-size:2em;");
+    wrapper.append_child(&add_button).unwrap();
+
+    let remove_button: HtmlElement = document.create_element("button");
+    remove_button.set_inner_text("✖");
+    remove_button
+        .style()
+        .set_css_text("color:red;font-size:2em;");
+    wrapper.append_child(&remove_button).unwrap();
+
+    let container: Element = document.create_element("div");
     for output in outputs {
+        let span: Element = document.create_element("span");
         setup_single_output_span(&span, output);
+        container.append_child(&span).unwrap();
+    }
+    wrapper.append_child(&container).unwrap();
+    td.append_child(&wrapper).unwrap();
+
+    update_output_buttons(&container, &add_button, &remove_button);
+
+    {
+        let container = container.clone();
+        let add_button_clone = add_button.clone();
+        let remove_button_clone = remove_button.clone();
+        set_onclick(
+            &add_button,
+            Box::new(move || {
+                let document = Document::get();
+                let span: Element = document.create_element("span");
+                setup_single_output_span(&span, &ComputerInput::Keyboard(Default::default()));
+                container.append_child(&span).unwrap();
+                update_output_buttons(&container, &add_button_clone, &remove_button_clone);
+            }) as Box<dyn FnMut()>,
+        );
+    }
+
+    {
+        let container = container.clone();
+        let add_button_clone = add_button.clone();
+        let remove_button_clone = remove_button.clone();
+        set_onclick(
+            &remove_button,
+            Box::new(move || {
+                if let Some(last) = container.last_element_child() {
+                    last.remove();
+                }
+                update_output_buttons(&container, &add_button_clone, &remove_button_clone);
+            }) as Box<dyn FnMut()>,
+        );
     }
 
     td
