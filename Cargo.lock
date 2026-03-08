@@ -429,7 +429,7 @@ dependencies = [
 
 [[package]]
 name = "dpedal_flash"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "arrayvec",
  "clap",
