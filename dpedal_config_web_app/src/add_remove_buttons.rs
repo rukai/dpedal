@@ -15,12 +15,16 @@ impl AddRemoveButtons {
         let add: HtmlElement = document.create_element("button");
         add.set_inner_text("✚");
         add.set_title(&format!("Add {kind}"));
-        add.set_class_name("add-button");
+        add.set_class_name("green-button");
+        add.style().set_css_text("font-size:2em;");
 
         let remove: HtmlElement = document.create_element("button");
         remove.set_inner_text("✖");
         remove.set_title(&format!("Remove {kind}"));
-        remove.set_class_name("remove-button");
+        remove.set_class_name("red-button");
+        remove
+            .style()
+            .set_css_text("font-size:2em;margin-right:4px;");
 
         AddRemoveButtons { add, remove }
     }

@@ -98,9 +98,11 @@ async fn open_device() {
             <input type="color" id="device_color">
 
             <div id="profiles-container"></div>
-            <button id="add-profile" style="margin-top:2em;">Add Profile</button>
-            <button id="save">Save</button>
-            <span id="save-result" style="font-size:1.5em;"></span>
+            <button id="add-profile" class="green-button" style="margin-top:2em;">Add Profile</button>
+            <div style="margin-top:1em;">
+                <button id="save" class="green-button" style="padding:0.5em 2em;">Save</button>
+                <span id="save-result" style="font-size:2em;"></span>
+            </div>
             "#,
     );
 
@@ -209,8 +211,9 @@ async fn write_config(
         for row in ElementChildIter::new(&table).skip(1) {
             let mut cells = ElementChildIter::new(&row);
 
-            let input_cell = cells.next().unwrap();
-            let selects_container = ElementChildIter::new(&input_cell).nth(2).unwrap();
+            let input_cell: Element = cells.next().unwrap();
+            let wrapper = input_cell.children().item(0).unwrap();
+            let selects_container = wrapper.children().item(2).unwrap();
             let input = ArrayVec::from_iter(ElementChildIter::new(&selects_container).map(
                 |wrapper: Element| {
                     let s: HtmlSelectElement =
@@ -338,6 +341,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
 
     let remove_button: HtmlElement = document.create_element("button");
     remove_button.set_inner_text("Remove");
+    remove_button.set_class_name("red-button");
     let profile_section_clone = profile_section.clone();
     set_onclick(
         &remove_button,
@@ -352,13 +356,17 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
 
     let table: HtmlElement = document.create_element("table");
     table.set_class_name("mapping-table");
-    table.set_inner_html("<tr><th style='font-size:1.5em'>Input</th><th style='font-size:1.5em'>Output</th><th style='font-size:1.5em'>Remove</th></tr>");
+    table.set_inner_html("<tr><th style='font-size:1.5em;width:30%'>Input</th><th style='font-size:1.5em'>Output</th><th style='font-size:1.5em;width:4.5em'>Remove</th></tr>");
     table.style().set_css_text("margin:0;");
 
     let add_row_button: HtmlElement = document.create_element("button");
     add_row_button.set_inner_text("Add row");
     add_row_button
-        .set_attribute("class", "add-row-button")
+        .set_attribute("class", "add-row-button green-button")
+        .unwrap();
+    add_row_button
+        .style()
+        .set_property("margin-top", "1em")
         .unwrap();
     let table_clone = table.clone();
     let add_row_button_clone = add_row_button.clone();
@@ -371,8 +379,6 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
             update_add_row_button(&add_row_button_clone, &table_clone);
         }) as Box<dyn FnMut()>,
     );
-    header_row.append_child(&add_row_button).unwrap();
-
     profile_section.append_child(&header_row).unwrap();
 
     for mapping in &profile.mappings {
@@ -380,6 +386,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
         table.append_child(&row).unwrap();
     }
     profile_section.append_child(&table).unwrap();
+    profile_section.append_child(&add_row_button).unwrap();
 
     update_add_row_button(&add_row_button, &table);
 
@@ -424,7 +431,8 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
     let remove_btn: HtmlElement = document.create_element("button");
     remove_btn.set_inner_text("✖");
     remove_btn.set_title("Remove Row");
-    remove_btn.set_class_name("remove-button");
+    remove_btn.set_class_name("red-button");
+    remove_btn.style().set_css_text("font-size:2em;");
     let tr_clone = tr.clone();
     set_onclick(
         &remove_btn,
