@@ -1,0 +1,145 @@
+/* config web app specific css - builds ontop of the css in base.html */
+
+.chord-container,
+.sequence-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.chord-container>*,
+.sequence-container>* {
+    position: relative;
+}
+
+.chord-container> :not(:first-child),
+.sequence-container> :not(:first-child) {
+    margin-top: 4px;
+}
+
+.chord-container> :not(:first-child)::before {
+    content: "+";
+    font-size: 2em;
+    font-weight: bold;
+    position: absolute;
+    right: 100%;
+    margin-right: 0.2em;
+}
+
+.sequence-container> :not(:first-child)::before {
+    content: "➜";
+    font-size: 2em;
+    position: absolute;
+    right: 100%;
+    margin-right: 0.2em;
+}
+
+.green-button {
+    background-color: #5ab44f;
+    color: white;
+}
+
+.red-button {
+    background-color: #c95454;
+    color: white;
+}
+
+.green-button:hover {
+    background-color: #229313;
+}
+
+.red-button:hover {
+    background-color: #bc1717;
+}
+
+.profile-section {
+    background-color: #a8d4ea;
+    padding: 1em;
+    border-radius: 0.5em;
+    margin-top: 3em;
+    margin-bottom: 0.5em;
+}
+
+/*
+ * Rounded-corner tables: border-collapse must be "separate" for border-radius to work on the table element.
+ * The table's own border draws the outer edge, so cell borders only draw internal grid lines (bottom + left).
+ * First-column and last-row cells have those internal borders removed to avoid doubling with the table border.
+ */
+table {
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 0.5em;
+    background-color: #DDDDDD;
+    width: 100%;
+    table-layout: fixed;
+    margin: 0;
+}
+
+th {
+    font-size: 1.5em;
+}
+
+th,
+td {
+    border-style: solid;
+    border-color: #333333;
+    border-width: 0 0 3px 3px;
+    vertical-align: top;
+    padding: 4px;
+}
+
+/* Disable outer border */
+th:first-child,
+td:first-child {
+    border-left-width: 0;
+}
+
+tr:last-child td {
+    border-bottom-width: 0;
+}
+
+input:invalid {
+    background-color: red;
+}
+
+@media (prefers-color-scheme: dark) {
+    .green-button {
+        background-color: #1b760f;
+        color: white;
+    }
+
+    .red-button {
+        background-color: #961212;
+        color: white;
+    }
+
+    .green-button:hover {
+        background-color: #5ab44f;
+    }
+
+    .red-button:hover {
+        background-color: #c95454;
+    }
+
+    .profile-section {
+        background-color: #1a4a6b;
+    }
+
+    table {
+        background-color: #222222;
+    }
+
+    th,
+    td {
+        border-color: #b9b9b9;
+    }
+
+    input,
+    select {
+        background-color: #3b3b3b;
+        color: #FFFFFF;
+    }
+
+    input[type="color"]:hover {
+        background-color: #5e5e5e;
+    }
+}

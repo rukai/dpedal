@@ -49,6 +49,7 @@ pub fn run() {
     console_log::init_with_level(Level::Info).expect("could not initialize logger");
 
     let document = Document::get();
+    inject_css(&document);
     set_button_on_click(
         &document,
         "open-device",
@@ -325,10 +326,6 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     profile_section
         .set_attribute("class", "profile-section")
         .unwrap();
-    profile_section
-        .style()
-        .set_css_text("margin-top:3em;margin-bottom:0.5em");
-
     let header_row: HtmlElement = document.create_element("div");
     header_row
         .style()
@@ -356,8 +353,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
 
     let table: HtmlElement = document.create_element("table");
     table.set_class_name("mapping-table");
-    table.set_inner_html("<tr><th style='font-size:1.5em;width:30%'>Input</th><th style='font-size:1.5em'>Output</th><th style='font-size:1.5em;width:4.5em'>Remove</th></tr>");
-    table.style().set_css_text("margin:0;");
+    table.set_inner_html("<tr><th style='width:30%'>Input</th><th>Output</th><th style='width:4.5em'>Remove</th></tr>");
 
     let add_row_button: HtmlElement = document.create_element("button");
     add_row_button.set_inner_text("Add row");
@@ -720,4 +716,16 @@ struct PreservedConfig {
     version: u32,
     device: DPedalDevice,
     pin_remappings: ArrayVec<PinRemapping, MAX_PIN_REMAPPINGS>,
+}
+
+fn inject_css(document: &Document) {
+    let style: Element = document.create_element("style");
+    style.set_text_content(Some(include_str!("style.css")));
+    document
+        .0
+        .query_selector("head")
+        .unwrap()
+        .unwrap()
+        .append_child(&style)
+        .unwrap();
 }
