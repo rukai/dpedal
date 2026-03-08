@@ -1,7 +1,15 @@
 use dpedal_config::web_config_protocol::{Request, Response};
 use futures::lock::Mutex;
 use postcard::accumulator::CobsAccumulator;
-use webusb_web::{OpenUsbDevice, Usb, UsbDeviceFilter};
+use std::{cell::RefCell, rc::Rc};
+use webusb_web::{OpenUsbDevice, Usb, UsbDevice, UsbDeviceFilter};
+
+pub type DeviceList = Rc<RefCell<Vec<OpenDevice>>>;
+
+pub struct OpenDevice {
+    pub usb_device: UsbDevice,
+    pub device: Rc<Device>,
+}
 
 pub struct Device {
     usb: OpenUsbDevice,
@@ -9,7 +17,7 @@ pub struct Device {
 }
 
 impl Device {
-    pub async fn new() -> Result<Self, String> {
+    pub async fn new(devices: &DeviceList) -> Result<Rc<Self>, String> {
         let usb = Usb::new().map_err(|e| e.msg().to_string())?;
 
         let mut filter = UsbDeviceFilter::new();
@@ -19,6 +27,15 @@ impl Device {
             .request_device([filter])
             .await
             .map_err(|e| e.msg().to_string())?;
+
+        if let Some(device) = devices
+            .borrow()
+            .iter()
+            .find(|o| o.usb_device == usb_device)
+            .map(|o| Rc::clone(&o.device))
+        {
+            return Ok(device);
+        }
 
         let open_usb = usb_device
             .open()
@@ -32,10 +49,15 @@ impl Device {
             .await
             .map_err(|e| e.msg().to_string())?;
 
-        Ok(Device {
+        let device = Rc::new(Device {
             usb: open_usb,
             lock: Mutex::new(()),
-        })
+        });
+        devices.borrow_mut().push(OpenDevice {
+            usb_device,
+            device: Rc::clone(&device),
+        });
+        Ok(device)
     }
 
     pub async fn send_request(&self, request: &Request) -> Result<Response, String> {

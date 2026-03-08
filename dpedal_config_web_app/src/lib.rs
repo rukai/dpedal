@@ -21,6 +21,7 @@ use dpedal_config::web_config_protocol::Response;
 use element_iterator::ElementChildIter;
 use log::Level;
 use rkyv::rancor::Error;
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
@@ -33,7 +34,7 @@ use web_sys::HtmlInputElement;
 use web_sys::HtmlSelectElement;
 
 use crate::add_remove_buttons::AddRemoveButtons;
-use crate::device::Device;
+use crate::device::{Device, DeviceList};
 use crate::document::Document;
 use crate::dom_helpers::{clear_children, set_button_on_click, set_onchange, set_onclick};
 
@@ -50,21 +51,23 @@ pub fn run() {
 
     let document = Document::get();
     inject_css(&document);
+    let devices: DeviceList = Rc::new(RefCell::new(Vec::new()));
     set_button_on_click(
         &document,
         "open-device",
         Box::new(move || {
-            wasm_bindgen_futures::spawn_local(open_device());
+            let devices = devices.clone();
+            wasm_bindgen_futures::spawn_local(open_device(devices));
         }) as Box<dyn FnMut()>,
     );
 }
 
 /// Opens a webusb device and setup + unhide the configuration UI sections
-async fn open_device() {
+async fn open_device(devices: DeviceList) {
     let document = Document::get();
     set_error(&document, "");
 
-    let device = match Device::new().await {
+    let device = match Device::new(&devices).await {
         Ok(device) => device,
         Err(e) => {
             set_error(&document, &e);
@@ -131,7 +134,6 @@ async fn open_device() {
         pin_remappings: config.pin_remappings,
     };
 
-    let device = Rc::new(device);
     set_button_on_click(
         &document,
         "save",
