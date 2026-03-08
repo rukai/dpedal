@@ -340,7 +340,11 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
 
     let table: HtmlElement = document.create_element("table");
     table.set_class_name("mapping-table");
-    table.set_inner_html("<tr><th style='width:30%'>Input</th><th>Output</th><th style='width:4.5em'>Remove</th></tr>");
+    table.set_inner_html(r#"<tr>
+        <th style='width:30%'><abbr title='Each cell contains a series of chorded pedal inputs that must be all held to activate the output cell.'>Input</abbr></th>
+        <th><abbr title='Each cell contains a series of PC inputs forming a macro.'>Output</abbr></th>
+        <th style='width:4.5em'>Remove</th>
+    </tr>"#);
 
     let add_row_button: HtmlElement = document.create_element("button");
     add_row_button.set_inner_text("Add row");
