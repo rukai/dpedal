@@ -313,5 +313,5 @@ pub enum DpedalInputKdl {
 #[kdl_config_finalize_into = "dpedal_config::Device"]
 pub enum DeviceKdl {
     #[default]
-    Dpedal,
+    DPedalV3,
 }

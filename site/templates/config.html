@@ -9,11 +9,31 @@ DPedal Config
 {% endblock %}
 
 {% block content %}
-<h1>Web configuration tool</h1>
 <div id="config-app">
-    <div id="device-selection">
-        <button id="open-device">Open device</button>
-        <p id="error" style="color:red"></p>
+    <div id="mapping-section">
+        <div id="device-selection">
+            <h1>Web configuration tool</h1>
+            <button id="open-device">Open device</button>
+            <p id="error" style="color:red"></p>
+        </div>
+        <div id="meta-section" hidden style="margin-bottom:2em;">
+            <div class="meta-form">
+                <label>Device:</label>
+                <span id="device_type"></span>
+                <label for="device_name">Nickname:</label>
+                <input type="text" id="device_name" style="font-size:2em;">
+                <label for="device_color">Color:</label>
+                <input type="color" id="device_color">
+            </div>
+        </div>
+        <div id="mapping-content" hidden style="margin-bottom:2em;">
+            <div id="profiles-container"></div>
+            <button id="add-profile" class="green-button">Add Profile</button>
+        </div>
+        <div id="save-section" hidden>
+            <button id="save" class="green-button" style="padding:0.5em 2em;">Save</button>
+            <span id="save-result" style="font-size:2em;"></span>
+        </div>
     </div>
 </div>
 
