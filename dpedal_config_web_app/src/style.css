@@ -55,8 +55,7 @@
     background-color: #a8d4ea;
     padding: 1em;
     border-radius: 0.5em;
-    margin-top: 3em;
-    margin-bottom: 0.5em;
+    margin-bottom: 3em;
 }
 
 /*
@@ -70,6 +69,7 @@ table {
     border-radius: 0.5em;
     background-color: #DDDDDD;
     width: 100%;
+    min-width: 1100px;
     table-layout: fixed;
     margin: 0;
 }
@@ -97,8 +97,45 @@ tr:last-child td {
     border-bottom-width: 0;
 }
 
+.meta-form {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.5em 1em;
+}
+
 input:invalid {
     background-color: red;
+}
+
+@media (min-width: 1900px) {
+    #mapping-section {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto 1fr;
+        gap: 1em;
+    }
+
+    #device-selection {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    #meta-section {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    #mapping-content {
+        grid-column: 2;
+        grid-row: 1 / -1;
+    }
+
+    #save-section {
+        grid-column: 1;
+        grid-row: 3;
+        align-self: start;
+    }
 }
 
 @media (prefers-color-scheme: dark) {

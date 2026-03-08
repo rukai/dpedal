@@ -59,7 +59,7 @@ pub fn run() {
     );
 }
 
-/// Opens a webusb device, creating (or replacing the existing) #mapping-section with UI for configuring the device
+/// Opens a webusb device and setup + unhide the configuration UI sections
 async fn open_device() {
     let document = Document::get();
     set_error(&document, "");
@@ -84,33 +84,19 @@ async fn open_device() {
         }
     };
 
-    let config_div = document
-        .0
-        .get_element_by_id("mapping-section")
-        .unwrap_or_else(|| {
-            let config_div: Element = document.create_element("div");
-            config_div.set_id("mapping-section");
-            config_div
-        });
-    config_div.set_inner_html(
-        r#"
-            <label>Nickname: </label>
-            <input type="text" id="device_name" style="font-size:2em;">
-            <input type="color" id="device_color">
+    // Unhide sections (hidden by default in HTML until device is opened)
+    let meta_section: Element = document.get_element("meta-section");
+    meta_section.remove_attribute("hidden").unwrap();
+    let mapping_content: Element = document.get_element("mapping-content");
+    mapping_content.remove_attribute("hidden").unwrap();
+    let save_section: Element = document.get_element("save-section");
+    save_section.remove_attribute("hidden").unwrap();
 
-            <div id="profiles-container"></div>
-            <button id="add-profile" class="green-button" style="margin-top:2em;">Add Profile</button>
-            <div style="margin-top:1em;">
-                <button id="save" class="green-button" style="padding:0.5em 2em;">Save</button>
-                <span id="save-result" style="font-size:2em;"></span>
-            </div>
-            "#,
-    );
-
-    let config_div: HtmlElement = config_div.dyn_into().unwrap();
-
-    let app_div: Element = document.get_element("config-app");
-    app_div.append_child(&config_div).unwrap();
+    // Clear previous state for re-open case
+    let profiles_container: Element = document.get_element("profiles-container");
+    clear_children(&profiles_container);
+    let save_result: Element = document.get_element("save-result");
+    save_result.set_text_content(None);
 
     let name: HtmlInputElement = document.get_element("device_name");
     name.set_value(config.nickname.as_ref());
@@ -327,9 +313,9 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
         .set_attribute("class", "profile-section")
         .unwrap();
     let header_row: HtmlElement = document.create_element("div");
-    header_row
-        .style()
-        .set_css_text("display:flex; align-items:center; gap:1em;margin-bottom:0.5em");
+    header_row.style().set_css_text(
+        "display:flex; align-items:center; gap:1em;margin-bottom:0.5em;padding-left:1em",
+    );
 
     let heading: HtmlElement = document.create_element("h2");
     heading.style().set_css_text("margin:0;");
@@ -360,10 +346,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     add_row_button
         .set_attribute("class", "add-row-button green-button")
         .unwrap();
-    add_row_button
-        .style()
-        .set_property("margin-top", "1em")
-        .unwrap();
+    add_row_button.style().set_css_text("margin-top:1em");
     let table_clone = table.clone();
     let add_row_button_clone = add_row_button.clone();
     set_onclick(
