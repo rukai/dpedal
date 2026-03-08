@@ -59,11 +59,11 @@ impl Default for Config {
     }
 }
 
-#[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
+#[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone, IntoStaticStr)]
 #[rkyv(derive(Debug))]
 pub enum Device {
     #[default]
-    Dpedal,
+    DPedalV3,
 }
 
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]

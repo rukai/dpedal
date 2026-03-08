@@ -85,18 +85,19 @@ async fn open_device() {
     };
 
     // Unhide sections (hidden by default in HTML until device is opened)
-    let meta_section: Element = document.get_element("meta-section");
-    meta_section.remove_attribute("hidden").unwrap();
-    let mapping_content: Element = document.get_element("mapping-content");
-    mapping_content.remove_attribute("hidden").unwrap();
-    let save_section: Element = document.get_element("save-section");
-    save_section.remove_attribute("hidden").unwrap();
+    for id in ["meta-section", "mapping-content", "save-section"] {
+        let section: Element = document.get_element(id);
+        section.remove_attribute("hidden").unwrap();
+    }
 
     // Clear previous state for re-open case
     let profiles_container: Element = document.get_element("profiles-container");
     clear_children(&profiles_container);
     let save_result: Element = document.get_element("save-result");
     save_result.set_text_content(None);
+
+    let device_type: HtmlElement = document.get_element("device_type");
+    device_type.set_inner_text(<&str>::from(&config.device));
 
     let name: HtmlInputElement = document.get_element("device_name");
     name.set_value(config.nickname.as_ref());
