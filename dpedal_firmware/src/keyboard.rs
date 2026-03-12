@@ -82,7 +82,17 @@ impl Keyboard {
     }
 }
 
+/// First keycode in the USB HID modifier range (LeftControl through RightWindows).
+/// Modifier keys must be sent via the modifier byte, not the keycodes array.
+const MODIFIER_KEYCODE_START: u8 = 0xE0;
+
 fn set_key(report: &mut KeyboardReport, keycode: u8) {
+    if keycode >= MODIFIER_KEYCODE_START {
+        // modifier field has a bit for each modifier keycode in order
+        report.modifier |= 1 << (keycode - MODIFIER_KEYCODE_START);
+        return;
+    }
+
     // if keycode already set, do nothing
     for check_keycode in &mut report.keycodes {
         if *check_keycode == keycode {
@@ -100,6 +110,11 @@ fn set_key(report: &mut KeyboardReport, keycode: u8) {
 }
 
 fn clear_key(report: &mut KeyboardReport, keycode: u8) {
+    if keycode >= MODIFIER_KEYCODE_START {
+        report.modifier &= !(1 << (keycode - MODIFIER_KEYCODE_START));
+        return;
+    }
+
     for check_keycode in &mut report.keycodes {
         if *check_keycode == keycode {
             *check_keycode = 0;
