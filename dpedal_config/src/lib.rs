@@ -173,7 +173,7 @@ pub enum MappingMode {
 
     /// The output_sequence is triggered on an input_set hold that lasts longer than u16 milliseconds
     /// The output_sequence is terminated on input_set release or the output_sequence reaches its end
-    OnHoldMillisecondsUntilRelease(u16),
+    OnHoldMillisUntilRelease(u16),
 
     /// The output_sequence is triggered on an input_set press
     /// The output_sequence is terminated on the next input_set press
@@ -192,38 +192,34 @@ pub enum MappingMode {
     /// The output_sequence is triggered when an input_set press and then release occur within u16 milliseconds
     /// The output_sequence is terminated when the output_sequence reaches its end
     /// input_set events that occur while the output_sequence is still running have no effect
-    MacroOnTapMilliseconds(u16),
+    MacroOnTapMillis(u16),
 
     /// The output_sequence is triggered when an input_set press and then release and then press and then release occurs within u16 milliseconds
     /// The output_sequence is terminated when the output_sequence reaches its end
     /// input_set events that occur while the output_sequence is still running have no effect
-    MacroOnDoubleTapMilliseconds(u16),
+    MacroOnDoubleTapMillis(u16),
 
     /// The output_sequence is triggered on an input_set hold that lasts longer than u16 milliseconds
     /// The output_sequence is terminated when the output_sequence reaches its end
     /// input_set events that occur while the output_sequence is still running have no effect
-    MacroOnHoldMilliseconds(u16),
+    MacroOnHoldMillis(u16),
 }
 
 impl MappingMode {
     pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
             "OnPressUntilRelease" => Some(MappingMode::OnPressUntilRelease),
-            "OnHoldMillisecondsUntilRelease" => Some(MappingMode::OnHoldMillisecondsUntilRelease(
-                value.parse().ok()?,
-            )),
+            "OnHoldMillisUntilRelease" => {
+                Some(MappingMode::OnHoldMillisUntilRelease(value.parse().ok()?))
+            }
             "Toggle" => Some(MappingMode::Toggle),
             "MacroOnPress" => Some(MappingMode::MacroOnPress),
             "MacroOnRelease" => Some(MappingMode::MacroOnRelease),
-            "MacroOnTapMilliseconds" => {
-                Some(MappingMode::MacroOnTapMilliseconds(value.parse().ok()?))
+            "MacroOnTapMillis" => Some(MappingMode::MacroOnTapMillis(value.parse().ok()?)),
+            "MacroOnDoubleTapMillis" => {
+                Some(MappingMode::MacroOnDoubleTapMillis(value.parse().ok()?))
             }
-            "MacroOnDoubleTapMilliseconds" => Some(MappingMode::MacroOnDoubleTapMilliseconds(
-                value.parse().ok()?,
-            )),
-            "MacroOnHoldMilliseconds" => {
-                Some(MappingMode::MacroOnHoldMilliseconds(value.parse().ok()?))
-            }
+            "MacroOnHoldMillis" => Some(MappingMode::MacroOnHoldMillis(value.parse().ok()?)),
             _ => None,
         }
     }
@@ -674,98 +670,6 @@ pub enum KeyboardInput {
     CrSelProps = 0xA3,
     /// Keyboard ExSel
     ExSel = 0xA4,
-    /// Keypad 00
-    Keypad00 = 0xB0,
-    /// Keypad 000
-    Keypad000 = 0xB1,
-    /// Thousands Separator (Footnote 31)
-    ThousandsSeparator = 0xB2,
-    /// Decimal Separator (Footnote 31)
-    DecimalSeparator = 0xB3,
-    /// Currency Unit (Footnote 32)
-    CurrencyUnit = 0xB4,
-    /// Currency Sub-unit (Footnote 32)
-    CurrencySubunit = 0xB5,
-    /// Keypad (
-    KeypadOpenParens = 0xB6,
-    /// Keypad )
-    KeypadCloseParens = 0xB7,
-    /// Keypad {
-    KeypadOpenBrace = 0xB8,
-    /// Keypad }
-    KeypadCloseBrace = 0xB9,
-    /// Keypad Tab
-    KeypadTab = 0xBA,
-    /// Keypad Backspace
-    KeypadBackspace = 0xBB,
-    /// Keypad A
-    KeypadA = 0xBC,
-    /// Keypad B
-    KeypadB = 0xBD,
-    /// Keypad C
-    KeypadC = 0xBE,
-    /// Keypad D
-    KeypadD = 0xBF,
-    /// Keypad E
-    KeypadE = 0xC0,
-    /// Keypad F
-    KeypadF = 0xC1,
-    /// Keypad XOR
-    KeypadBitwiseXor = 0xC2,
-    /// Keypad ^
-    KeypadLogicalXor = 0xC3,
-    /// Keypad %
-    KeypadModulo = 0xC4,
-    /// Keypad <
-    KeypadLeftShift = 0xC5,
-    /// Keypad >
-    KeypadRightShift = 0xC6,
-    /// Keypad &
-    KeypadBitwiseAnd = 0xC7,
-    /// Keypad &&
-    KeypadLogicalAnd = 0xC8,
-    /// Keypad |
-    KeypadBitwiseOr = 0xC9,
-    /// Keypad ||
-    KeypadLogicalOr = 0xCA,
-    /// Keypad :
-    KeypadColon = 0xCB,
-    /// Keypad #
-    KeypadHash = 0xCC,
-    /// Keypad Space
-    KeypadSpace = 0xCD,
-    /// Keypad @
-    KeypadAt = 0xCE,
-    /// Keypad !
-    KeypadExclamation = 0xCF,
-    /// Keypad Memory Store
-    KeypadMemoryStore = 0xD0,
-    /// Keypad Memory Recall
-    KeypadMemoryRecall = 0xD1,
-    /// Keypad Memory Clear
-    KeypadMemoryClear = 0xD2,
-    /// Keypad Memory Add
-    KeypadMemoryAdd = 0xD3,
-    /// Keypad Memory Subtract
-    KeypadMemorySubtract = 0xD4,
-    /// Keypad Memory Multiply
-    KeypadMemoryMultiply = 0xD5,
-    /// Keypad Memory Divice
-    KeypadMemoryDivide = 0xD6,
-    /// Keypad +/-
-    KeypadPositiveNegative = 0xD7,
-    /// Keypad Clear
-    KeypadClear = 0xD8,
-    /// Keypad Clear Entry
-    KeypadClearEntry = 0xD9,
-    /// Keypad Binary
-    KeypadBinary = 0xDA,
-    /// Keypad Octal
-    KeypadOctal = 0xDB,
-    /// Keypad Decimal
-    KeypadDecimal = 0xDC,
-    /// Keypad Hexadecimal
-    KeypadHexadecimal = 0xDD,
     /// Keyboard LeftControl
     LeftControl = 0xE0,
     /// Keyboard LeftShift
@@ -909,15 +813,15 @@ pub enum DPedalControl {
     /// However, when this variant is included in the output_sequence, all elements after this one are blocked.
     /// Additionally, when the number of milliseconds have passed:
     /// * all previous elements are held
-    /// * all future elements (until another AfterMilliseconds*) are activated.
-    AfterMillisecondsHold(u16),
+    /// * all future elements (until another AfterMillis*) are activated.
+    AfterMillisHold(u16),
 
     /// By default all ComputerInputs in the output_sequence are held until the terminate_on condition is met.
     /// However, when this variant is included in the output_sequence, all elements after this one are blocked.
     /// Additionally, when the number of milliseconds have passed:
     /// * all previous elements are terminated
-    /// * all future elements (until another AfterMilliseconds*) are activated.
-    AfterMillisecondsRelease(u16),
+    /// * all future elements (until another AfterMillis*) are activated.
+    AfterMillisRelease(u16),
 
     /// Restarts this output_sequence from the beginning.
     #[default]
@@ -930,12 +834,8 @@ pub enum DPedalControl {
 impl DPedalControl {
     pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
-            "AfterMillisecondsHold" => {
-                Some(DPedalControl::AfterMillisecondsHold(value.parse().ok()?))
-            }
-            "AfterMillisecondsRelease" => {
-                Some(DPedalControl::AfterMillisecondsRelease(value.parse().ok()?))
-            }
+            "AfterMillisHold" => Some(DPedalControl::AfterMillisHold(value.parse().ok()?)),
+            "AfterMillisRelease" => Some(DPedalControl::AfterMillisRelease(value.parse().ok()?)),
             "Restart" => Some(DPedalControl::Restart),
             "SetProfile" => Some(DPedalControl::SetProfile(value.parse().ok()?)),
             _ => None,
