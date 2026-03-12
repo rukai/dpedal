@@ -1,7 +1,7 @@
 use arrayvec::{ArrayString, ArrayVec};
 use dpedal_config::{
     ComputerInput, Config, DpedalInput, KeyboardInput, MAX_COMPUTER_INPUTS, MAX_DPEDAL_INPUTS,
-    MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MouseInput,
+    MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MappingMode, MouseInput,
 };
 use kdl::{KdlDocument, KdlNode};
 use kdl_config::{
@@ -86,8 +86,9 @@ pub struct ProfileKdl {
 
 #[derive(Default, Debug)]
 pub struct MappingKdl {
-    pub input: ArrayVec<dpedal_config::DpedalInput, MAX_DPEDAL_INPUTS>,
-    pub output: ArrayVec<dpedal_config::ComputerInput, MAX_COMPUTER_INPUTS>,
+    pub input_set: ArrayVec<dpedal_config::DpedalInput, MAX_DPEDAL_INPUTS>,
+    pub mode: MappingMode,
+    pub output_sequence: ArrayVec<dpedal_config::ComputerInput, MAX_COMPUTER_INPUTS>,
 }
 
 impl KdlConfigFinalize for MappingKdl {
@@ -95,8 +96,9 @@ impl KdlConfigFinalize for MappingKdl {
 
     fn finalize(&self) -> Self::FinalizeType {
         Self::FinalizeType {
-            input: self.input.clone(),
-            output: self.output.clone(),
+            input_set: self.input_set.clone(),
+            mode: self.mode,
+            output_sequence: self.output_sequence.clone(),
         }
     }
 }
@@ -241,9 +243,13 @@ impl KdlConfig for MappingKdl {
                         };
                     }
                 };
-                let output = ArrayVec::from_iter([output]);
+                let output_sequence = ArrayVec::from_iter([output]);
                 Parsed {
-                    value: MappingKdl { input, output },
+                    value: MappingKdl {
+                        input_set: input,
+                        mode: MappingMode::OnPressUntilRelease,
+                        output_sequence,
+                    },
                     full_span: node.span(),
                     name_span: node.span(),
                     valid: true,
@@ -313,5 +319,5 @@ pub enum DpedalInputKdl {
 #[kdl_config_finalize_into = "dpedal_config::Device"]
 pub enum DeviceKdl {
     #[default]
-    DPedalV3,
+    DpedalV3,
 }

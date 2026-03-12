@@ -85,13 +85,13 @@ impl Inputs {
                 }
 
                 for (i, mapping) in profile.mappings.iter().enumerate() {
-                    if input_state.is_all_pressed(&mapping.input) {
-                        for output in &mapping.output {
+                    if input_state.is_all_pressed(&mapping.input_set) {
+                        for output in &mapping.output_sequence {
                             Inputs::pressed(*output).await;
                         }
                         state.mapping_state[i] = MappingState::Pressed;
                     } else {
-                        for output in &mapping.output {
+                        for output in &mapping.output_sequence {
                             if let MappingState::Pressed = state.mapping_state[i]
                                 && let ControlFlow::Break(()) =
                                     Inputs::released(*output, &mut state).await
@@ -111,7 +111,6 @@ impl Inputs {
 
     async fn pressed(input: ComputerInput) {
         match input {
-            ComputerInput::None => {}
             ComputerInput::Keyboard(key) => {
                 KEYBOARD_CHANNEL.send(KeyboardEvent::Pressed(key)).await
             }
@@ -123,7 +122,6 @@ impl Inputs {
     // Returns Break when state is invalidated and we need to start the next loop
     async fn released(input: ComputerInput, state: &mut State) -> ControlFlow<()> {
         match input {
-            ComputerInput::None => {}
             ComputerInput::Keyboard(key) => {
                 KEYBOARD_CHANNEL.send(KeyboardEvent::Released(key)).await
             }
@@ -152,7 +150,10 @@ impl State {
 
     fn update(&mut self, event: DPedalControl) -> ControlFlow<()> {
         match event {
-            DPedalControl::DoNothing => ControlFlow::Continue(()),
+            // TODO: implement these controls
+            DPedalControl::AfterMillisecondsHold(_)
+            | DPedalControl::AfterMillisecondsRelease(_)
+            | DPedalControl::Restart => ControlFlow::Continue(()),
             DPedalControl::SetProfile(profile) => {
                 self.current_profile = profile;
                 self.mapping_state.clear();

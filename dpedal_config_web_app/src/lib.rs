@@ -13,6 +13,7 @@ use dpedal_config::MAX_NICKNAME_LEN;
 use dpedal_config::MAX_PIN_REMAPPINGS;
 use dpedal_config::MAX_PROFILES;
 use dpedal_config::Mapping;
+use dpedal_config::MappingMode;
 use dpedal_config::MouseInput;
 use dpedal_config::PinRemapping;
 use dpedal_config::Profile;
@@ -212,8 +213,12 @@ async fn write_config(
                 },
             ));
 
-            let output = parse_output_cell(&cells.next().unwrap());
-            mappings.push(Mapping { input, output });
+            let output_sequence = parse_output_cell(&cells.next().unwrap());
+            mappings.push(Mapping {
+                input_set: input,
+                mode: MappingMode::OnPressUntilRelease,
+                output_sequence,
+            });
         }
 
         profiles.push(Profile { mappings });
@@ -407,9 +412,9 @@ pub fn set_error(document: &Document, error_message: &str) {
 fn create_row(document: &Document, mapping: &Mapping) -> Element {
     let tr: Element = document.create_element("tr");
 
-    tr.append_child(&create_row_input(document, &mapping.input))
+    tr.append_child(&create_row_input(document, &mapping.input_set))
         .unwrap();
-    tr.append_child(&create_row_output(document, &mapping.output))
+    tr.append_child(&create_row_output(document, &mapping.output_sequence))
         .unwrap();
 
     let remove_td: HtmlElement = document.create_element("td");
@@ -549,9 +554,6 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     );
     select_type.style().set_css_text("font-size:2em;");
     select_type.set_value(match output {
-        ComputerInput::None => {
-            return;
-        }
         ComputerInput::Mouse(_) => "mouse",
         ComputerInput::Keyboard(_) => "keyboard",
         ComputerInput::Control(_) => "control",
@@ -565,7 +567,6 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     let subtype_fields_span: Element = document.create_element("span");
 
     match output {
-        ComputerInput::None => {}
         ComputerInput::Mouse(mouse_input) => {
             let mut options = String::new();
             for variant in MouseInput::iter() {
@@ -642,8 +643,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
             let output = match select_type.value().as_str() {
                 "mouse" => ComputerInput::Mouse(Default::default()),
                 "keyboard" => ComputerInput::Keyboard(Default::default()),
-                "control" => ComputerInput::Control(Default::default()),
-                _ => ComputerInput::None,
+                _ => ComputerInput::Control(Default::default()),
             };
             setup_single_output_span(&span, &output);
         }) as Box<dyn FnMut()>,
@@ -667,8 +667,11 @@ fn setup_subtype_fields_mouse(span: &Element, mouse_input: &MouseInput) {
 
 fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
     let value = match control {
+        DPedalControl::AfterMillisecondsHold(x) | DPedalControl::AfterMillisecondsRelease(x) => {
+            Some(*x as i32)
+        }
         DPedalControl::SetProfile(x) => Some(*x as i32),
-        DPedalControl::DoNothing => None,
+        DPedalControl::Restart => None,
     };
     setup_subtype_fields_numeric(span, value);
 }
