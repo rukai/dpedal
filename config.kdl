@@ -1,7 +1,7 @@
 version 0
 
 // type of device being configured, currently dpedal is the only possible value
-device dpedal
+device dpedal-v3
 
 // This name shows up in the web configurator to help tell the pedals apart
 nickname "My DPedal"

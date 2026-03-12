@@ -63,7 +63,7 @@ impl Default for Config {
 #[rkyv(derive(Debug))]
 pub enum Device {
     #[default]
-    DPedalV3,
+    DpedalV3,
 }
 
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
@@ -87,30 +87,46 @@ impl Default for Profile {
         Self {
             mappings: ArrayVec::from_iter([
                 Mapping {
-                    input: ArrayVec::from_iter([DpedalInput::DpadLeft]),
-                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollLeft(10))]),
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadLeft]),
+                    mode: MappingMode::OnPressUntilRelease,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::ScrollLeft(10),
+                    )]),
                 },
                 Mapping {
-                    input: ArrayVec::from_iter([DpedalInput::DpadRight]),
-                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollRight(
-                        10,
-                    ))]),
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadRight]),
+                    mode: MappingMode::OnPressUntilRelease,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::ScrollRight(10),
+                    )]),
                 },
                 Mapping {
-                    input: ArrayVec::from_iter([DpedalInput::DpadUp]),
-                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollUp(10))]),
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadUp]),
+                    mode: MappingMode::OnPressUntilRelease,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::ScrollUp(10),
+                    )]),
                 },
                 Mapping {
-                    input: ArrayVec::from_iter([DpedalInput::DpadDown]),
-                    output: ArrayVec::from_iter([ComputerInput::Mouse(MouseInput::ScrollDown(10))]),
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadDown]),
+                    mode: MappingMode::OnPressUntilRelease,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::ScrollDown(10),
+                    )]),
                 },
                 Mapping {
-                    input: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
-                    output: ArrayVec::from_iter([ComputerInput::Keyboard(KeyboardInput::PageUp)]),
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
+                    mode: MappingMode::OnPressUntilRelease,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::PageUp,
+                    )]),
                 },
                 Mapping {
-                    input: ArrayVec::from_iter([DpedalInput::ButtonRight]),
-                    output: ArrayVec::from_iter([ComputerInput::Keyboard(KeyboardInput::PageDown)]),
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    mode: MappingMode::OnPressUntilRelease,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::PageDown,
+                    )]),
                 },
             ]),
         }
@@ -121,8 +137,96 @@ pub const MAX_DPEDAL_INPUTS: usize = 4;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Mapping {
-    pub input: ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
-    pub output: ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS>,
+    /// The input_set produces:
+    /// * a press event when (the last event was release OR there have been no events yet) AND all DpedalInput are held
+    /// * a release event when the last event was press AND at least one DPedalInput is not held.
+    pub input_set: ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
+
+    /// The output_sequence is triggered and/or terminated when the specified conditions in the input_set are met.
+    pub mode: MappingMode,
+
+    /// A sequence of ComputerInputs forming a simple key press or macro.
+    /// Can contain just a single ComputerInput for use as a regular computer input instead of a macro.
+    /// Once triggered, the output_sequence runs till completion or the terminate_on condition is met.
+    pub output_sequence: ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS>,
+}
+
+#[derive(
+    Format,
+    Archive,
+    Deserialize,
+    Serialize,
+    Debug,
+    PartialEq,
+    Default,
+    Clone,
+    Copy,
+    EnumIter,
+    IntoStaticStr,
+)]
+#[rkyv(derive(Debug))]
+pub enum MappingMode {
+    /// The output_sequence is triggered on input_set press
+    /// The output_sequence is terminated on input_set release or the output_sequence reaches its end
+    #[default]
+    OnPressUntilRelease,
+
+    /// The output_sequence is triggered on an input_set hold that lasts longer than u16 milliseconds
+    /// The output_sequence is terminated on input_set release or the output_sequence reaches its end
+    OnHoldMillisecondsUntilRelease(u16),
+
+    /// The output_sequence is triggered on an input_set press
+    /// The output_sequence is terminated on the next input_set press
+    Toggle,
+
+    /// The output_sequence is triggered on input_set press
+    /// The output_sequence is terminated when the output_sequence reaches its end
+    /// input_set events that occur while the output_sequence is still running have no effect
+    MacroOnPress,
+
+    /// The output_sequence is triggered on input_set release
+    /// The output_sequence is terminated when the output_sequence reaches its end
+    /// input_set events that occur while the output_sequence is still running have no effect
+    MacroOnRelease,
+
+    /// The output_sequence is triggered when an input_set press and then release occur within u16 milliseconds
+    /// The output_sequence is terminated when the output_sequence reaches its end
+    /// input_set events that occur while the output_sequence is still running have no effect
+    MacroOnTapMilliseconds(u16),
+
+    /// The output_sequence is triggered when an input_set press and then release and then press and then release occurs within u16 milliseconds
+    /// The output_sequence is terminated when the output_sequence reaches its end
+    /// input_set events that occur while the output_sequence is still running have no effect
+    MacroOnDoubleTapMilliseconds(u16),
+
+    /// The output_sequence is triggered on an input_set hold that lasts longer than u16 milliseconds
+    /// The output_sequence is terminated when the output_sequence reaches its end
+    /// input_set events that occur while the output_sequence is still running have no effect
+    MacroOnHoldMilliseconds(u16),
+}
+
+impl MappingMode {
+    pub fn from_string(s: &str, value: &str) -> Option<Self> {
+        match s {
+            "OnPressUntilRelease" => Some(MappingMode::OnPressUntilRelease),
+            "OnHoldMillisecondsUntilRelease" => Some(MappingMode::OnHoldMillisecondsUntilRelease(
+                value.parse().ok()?,
+            )),
+            "Toggle" => Some(MappingMode::Toggle),
+            "MacroOnPress" => Some(MappingMode::MacroOnPress),
+            "MacroOnRelease" => Some(MappingMode::MacroOnRelease),
+            "MacroOnTapMilliseconds" => {
+                Some(MappingMode::MacroOnTapMilliseconds(value.parse().ok()?))
+            }
+            "MacroOnDoubleTapMilliseconds" => Some(MappingMode::MacroOnDoubleTapMilliseconds(
+                value.parse().ok()?,
+            )),
+            "MacroOnHoldMilliseconds" => {
+                Some(MappingMode::MacroOnHoldMilliseconds(value.parse().ok()?))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(
@@ -175,11 +279,9 @@ impl DpedalInput {
     }
 }
 
-#[derive(Format, Archive, Deserialize, Serialize, Debug, PartialEq, Default, Clone, Copy)]
+#[derive(Format, Archive, Deserialize, Serialize, Debug, PartialEq, Clone, Copy)]
 #[rkyv(derive(Debug))]
 pub enum ComputerInput {
-    #[default]
-    None, // TODO: remove?
     Mouse(MouseInput),
     Keyboard(KeyboardInput),
     Control(DPedalControl),
@@ -803,17 +905,38 @@ const COMMON_KEYBOARD_INPUTS: [KeyboardInput; 93] = [
 )]
 #[rkyv(derive(Debug))]
 pub enum DPedalControl {
+    /// By default all ComputerInputs in the output_sequence are held until the terminate_on condition is met.
+    /// However, when this variant is included in the output_sequence, all elements after this one are blocked.
+    /// Additionally, when the number of milliseconds have passed:
+    /// * all previous elements are held
+    /// * all future elements (until another AfterMilliseconds*) are activated.
+    AfterMillisecondsHold(u16),
+
+    /// By default all ComputerInputs in the output_sequence are held until the terminate_on condition is met.
+    /// However, when this variant is included in the output_sequence, all elements after this one are blocked.
+    /// Additionally, when the number of milliseconds have passed:
+    /// * all previous elements are terminated
+    /// * all future elements (until another AfterMilliseconds*) are activated.
+    AfterMillisecondsRelease(u16),
+
+    /// Restarts this output_sequence from the beginning.
     #[default]
-    DoNothing,
-    // ReleaseAndSleep(u16)
-    // HoldAndSleep(u16)
+    Restart,
+
+    /// Change the profile to the configured index, any in progress output_sequences are terminated.
     SetProfile(u8),
 }
 
 impl DPedalControl {
     pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
-            "DoNothing" => Some(DPedalControl::DoNothing),
+            "AfterMillisecondsHold" => {
+                Some(DPedalControl::AfterMillisecondsHold(value.parse().ok()?))
+            }
+            "AfterMillisecondsRelease" => {
+                Some(DPedalControl::AfterMillisecondsRelease(value.parse().ok()?))
+            }
+            "Restart" => Some(DPedalControl::Restart),
             "SetProfile" => Some(DPedalControl::SetProfile(value.parse().ok()?)),
             _ => None,
         }
