@@ -660,7 +660,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
                 Box::new(move || {
                     // Create a default for the selected MouseInput
                     let mouse_input =
-                        MouseInput::from_string(&select_subtype_clone.value(), "10").unwrap();
+                        MouseInput::from_string(&select_subtype_clone.value(), "20").unwrap();
                     setup_subtype_fields_mouse(&subtype_fields_span, &mouse_input);
                 }) as Box<dyn FnMut()>,
             );

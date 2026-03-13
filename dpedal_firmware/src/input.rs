@@ -1,12 +1,8 @@
-use core::ops::ControlFlow;
-
 use crate::config::{CONFIG, CONFIG_UPDATED};
-use crate::keyboard::{KEYBOARD_CHANNEL, KeyboardEvent};
-use crate::mouse::{MOUSE_CHANNEL, MouseEvent};
+use crate::mapping_state::MappingState;
 use arrayvec::ArrayVec;
-use dpedal_config::{
-    ComputerInput, DPedalControl, DpedalInput, MAX_MAPPINGS, MAX_PROFILES, Profile,
-};
+use core::ops::ControlFlow;
+use dpedal_config::{DpedalInput, MAX_MAPPINGS, MAX_PROFILES, Profile};
 use embassy_rp::gpio::{AnyPin, Input, Pin, Pull};
 use embassy_rp::{Peri, PeripheralType};
 use embassy_time::Timer;
@@ -80,27 +76,20 @@ impl Inputs {
                 };
 
                 // Restore mapping state to full length in case it was cleared earlier
-                while profile.mappings.len() > state.mapping_state.len() {
-                    state.mapping_state.push(MappingState::Released);
+                while profile.mappings.len() > state.mapping_states.len() {
+                    state.mapping_states.push(MappingState::new());
                 }
 
                 for (i, mapping) in profile.mappings.iter().enumerate() {
-                    if input_state.is_all_pressed(&mapping.input_set) {
-                        for output in &mapping.output_sequence {
-                            Inputs::pressed(*output).await;
-                        }
-                        state.mapping_state[i] = MappingState::Pressed;
-                    } else {
-                        for output in &mapping.output_sequence {
-                            if let MappingState::Pressed = state.mapping_state[i]
-                                && let ControlFlow::Break(()) =
-                                    Inputs::released(*output, &mut state).await
-                            {
-                                continue 'main_loop;
-                            }
-                        }
-                        state.mapping_state[i] = MappingState::Released;
-                    }
+                    let all_pressed = input_state.is_all_pressed(&mapping.input_set);
+                    let outputs = &mapping.output_sequence[..];
+                    state.mapping_states[i] = match state.mapping_states[i]
+                        .process(mapping, outputs, all_pressed, &mut state)
+                        .await
+                    {
+                        ControlFlow::Continue(ms) => ms,
+                        ControlFlow::Break(()) => continue 'main_loop,
+                    };
                 }
             } else {
                 defmt::error!("No profile with index {}", state.current_profile)
@@ -108,66 +97,22 @@ impl Inputs {
             Timer::after_millis(1).await;
         }
     }
-
-    async fn pressed(input: ComputerInput) {
-        match input {
-            ComputerInput::Keyboard(key) => {
-                KEYBOARD_CHANNEL.send(KeyboardEvent::Pressed(key)).await
-            }
-            ComputerInput::Mouse(mouse) => MOUSE_CHANNEL.send(MouseEvent::Pressed(mouse)).await,
-            ComputerInput::Control(_) => {}
-        }
-    }
-
-    // Returns Break when state is invalidated and we need to start the next loop
-    async fn released(input: ComputerInput, state: &mut State) -> ControlFlow<()> {
-        match input {
-            ComputerInput::Keyboard(key) => {
-                KEYBOARD_CHANNEL.send(KeyboardEvent::Released(key)).await
-            }
-            ComputerInput::Mouse(mouse) => MOUSE_CHANNEL.send(MouseEvent::Released(mouse)).await,
-            ComputerInput::Control(control) => state.update(control)?,
-        }
-
-        ControlFlow::Continue(())
-    }
 }
 
-struct State {
+pub(crate) struct State {
     /// The index of the currently selected profile
-    current_profile: u8,
+    pub(crate) current_profile: u8,
     /// Tracks press/release state for each mapping in the current profile
-    mapping_state: ArrayVec<MappingState, MAX_MAPPINGS>,
+    pub(crate) mapping_states: ArrayVec<MappingState, MAX_MAPPINGS>,
 }
 
 impl State {
     fn new() -> Self {
         State {
             current_profile: 0,
-            mapping_state: ArrayVec::new(),
+            mapping_states: ArrayVec::new(),
         }
     }
-
-    fn update(&mut self, event: DPedalControl) -> ControlFlow<()> {
-        match event {
-            // TODO: implement these controls
-            DPedalControl::AfterMillisHold(_)
-            | DPedalControl::AfterMillisRelease(_)
-            | DPedalControl::Restart => ControlFlow::Continue(()),
-            DPedalControl::SetProfile(profile) => {
-                self.current_profile = profile;
-                self.mapping_state.clear();
-                ControlFlow::Break(())
-            }
-        }
-    }
-}
-
-enum MappingState {
-    Pressed,
-    Released,
-    // TODO
-    //MacroStuff,
 }
 
 struct DpedalInputState {

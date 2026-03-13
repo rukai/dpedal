@@ -58,11 +58,12 @@ impl Mouse {
             wheel: 0,
             pan: 0,
         };
-
-        let mut ticks = 0u32;
+        let mut cursor_x = Axis::new();
+        let mut cursor_y = Axis::new();
+        let mut scroll_x = Axis::new();
+        let mut scroll_y = Axis::new();
 
         loop {
-            ticks = ticks.wrapping_add(1);
             // Delay processing events until we are able to actually send the report to ensure the report contains the most up to date information.
             // TODO: Actually check behaviour of this await and write_serialize await, do they actually block until host has polled us?
             self.writer.ready().await;
@@ -70,45 +71,27 @@ impl Mouse {
             while let Ok(event) = MOUSE_CHANNEL.try_receive() {
                 match event {
                     MouseEvent::Pressed(input) => match input {
-                        MouseInput::ScrollUp(value) => {
-                            scroll(&mut report, ticks, 0, (value / 10) as i8)
-                        }
-                        MouseInput::ScrollDown(value) => {
-                            scroll(&mut report, ticks, 0, (value / -10) as i8)
-                        }
-                        MouseInput::ScrollLeft(value) => {
-                            scroll(&mut report, ticks, (value / -10) as i8, 0)
-                        }
-                        MouseInput::ScrollRight(value) => {
-                            scroll(&mut report, ticks, (value / 10) as i8, 0)
-                        }
-                        MouseInput::MoveUp(value) => {
-                            move_cursor(&mut report, ticks, 0, (value / -10) as i8)
-                        }
-                        MouseInput::MoveDown(value) => {
-                            move_cursor(&mut report, ticks, 0, (value / 10) as i8)
-                        }
-                        MouseInput::MoveLeft(value) => {
-                            move_cursor(&mut report, ticks, (value / -10) as i8, 0)
-                        }
-                        MouseInput::MoveRight(value) => {
-                            move_cursor(&mut report, ticks, (value / 10) as i8, 0)
-                        }
+                        MouseInput::ScrollUp(value) => scroll_y.add_velocity(value as i32),
+                        MouseInput::ScrollDown(value) => scroll_y.sub_velocity(value as i32),
+                        MouseInput::ScrollLeft(value) => scroll_x.sub_velocity(value as i32),
+                        MouseInput::ScrollRight(value) => scroll_x.add_velocity(value as i32),
+                        MouseInput::MoveUp(value) => cursor_y.sub_velocity(value as i32),
+                        MouseInput::MoveDown(value) => cursor_y.add_velocity(value as i32),
+                        MouseInput::MoveLeft(value) => cursor_x.sub_velocity(value as i32),
+                        MouseInput::MoveRight(value) => cursor_x.add_velocity(value as i32),
                         MouseInput::ClickLeft => report.buttons |= 0b0000_0001,
                         MouseInput::ClickRight => report.buttons |= 0b0000_0010,
                         MouseInput::ClickMiddle => report.buttons |= 0b0000_0100,
                     },
                     MouseEvent::Released(input) => match input {
-                        MouseInput::ScrollUp(_)
-                        | MouseInput::ScrollDown(_)
-                        | MouseInput::ScrollLeft(_)
-                        | MouseInput::ScrollRight(_)
-                        | MouseInput::MoveUp(_)
-                        | MouseInput::MoveDown(_)
-                        | MouseInput::MoveLeft(_)
-                        | MouseInput::MoveRight(_) => {
-                            // Releasing one of these inputs has no effect
-                        }
+                        MouseInput::ScrollUp(value) => scroll_y.sub_velocity(value as i32),
+                        MouseInput::ScrollDown(value) => scroll_y.add_velocity(value as i32),
+                        MouseInput::ScrollLeft(value) => scroll_x.add_velocity(value as i32),
+                        MouseInput::ScrollRight(value) => scroll_x.sub_velocity(value as i32),
+                        MouseInput::MoveUp(value) => cursor_y.add_velocity(value as i32),
+                        MouseInput::MoveDown(value) => cursor_y.sub_velocity(value as i32),
+                        MouseInput::MoveLeft(value) => cursor_x.add_velocity(value as i32),
+                        MouseInput::MoveRight(value) => cursor_x.sub_velocity(value as i32),
                         MouseInput::ClickLeft => report.buttons &= 0b1111_1110,
                         MouseInput::ClickRight => report.buttons &= 0b1111_1101,
                         MouseInput::ClickMiddle => report.buttons &= 0b1111_1011,
@@ -116,32 +99,16 @@ impl Mouse {
                 }
             }
 
-            // Send the report.
+            report.x = cursor_x.tick();
+            report.y = cursor_y.tick();
+            report.pan = scroll_x.tick();
+            report.wheel = scroll_y.tick();
+
             match self.writer.write_serialize(&report).await {
                 Ok(()) => {}
                 Err(e) => warn!("Failed to send report: {:?}", e),
             };
-
-            // reset non-button inputs
-            report.wheel = 0;
-            report.x = 0;
-            report.y = 0;
-            report.pan = 0;
         }
-    }
-}
-
-fn scroll(report: &mut MouseReport, ticks: u32, x: i8, y: i8) {
-    if ticks.is_multiple_of(80) {
-        report.pan += x;
-        report.wheel += y;
-    }
-}
-
-fn move_cursor(report: &mut MouseReport, ticks: u32, x: i8, y: i8) {
-    if ticks.is_multiple_of(80) {
-        report.x += x;
-        report.y += y;
     }
 }
 
@@ -150,4 +117,36 @@ fn move_cursor(report: &mut MouseReport, ticks: u32, x: i8, y: i8) {
 pub enum MouseEvent {
     Pressed(MouseInput),
     Released(MouseInput),
+}
+
+// poll_ms is 1, so there are 1000 ticks per second
+const TICKS_PER_SECOND: i32 = 1000;
+
+struct Axis {
+    velocity: i32,  // sum of active velocities (pixels/sec)
+    remainder: i32, // sub-pixel accumulator in 1/TICKS_PER_SECOND pixel units
+}
+
+impl Axis {
+    fn new() -> Self {
+        Axis {
+            velocity: 0,
+            remainder: 0,
+        }
+    }
+
+    fn add_velocity(&mut self, v: i32) {
+        self.velocity += v;
+    }
+
+    fn sub_velocity(&mut self, v: i32) {
+        self.velocity -= v;
+    }
+
+    fn tick(&mut self) -> i8 {
+        self.remainder += self.velocity;
+        let pixels = self.remainder / TICKS_PER_SECOND;
+        self.remainder %= TICKS_PER_SECOND;
+        pixels.clamp(-127, 127) as i8
+    }
 }

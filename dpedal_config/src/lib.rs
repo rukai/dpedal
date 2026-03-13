@@ -90,28 +90,28 @@ impl Default for Profile {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadLeft]),
                     mode: MappingMode::OnPressUntilRelease,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
-                        MouseInput::ScrollLeft(10),
+                        MouseInput::ScrollLeft(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadRight]),
                     mode: MappingMode::OnPressUntilRelease,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
-                        MouseInput::ScrollRight(10),
+                        MouseInput::ScrollRight(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadUp]),
                     mode: MappingMode::OnPressUntilRelease,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
-                        MouseInput::ScrollUp(10),
+                        MouseInput::ScrollUp(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadDown]),
                     mode: MappingMode::OnPressUntilRelease,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
-                        MouseInput::ScrollDown(10),
+                        MouseInput::ScrollDown(20),
                     )]),
                 },
                 Mapping {
@@ -206,6 +206,17 @@ pub enum MappingMode {
 }
 
 impl MappingMode {
+    pub fn is_macro(&self) -> bool {
+        matches!(
+            self,
+            MappingMode::MacroOnPress
+                | MappingMode::MacroOnRelease
+                | MappingMode::MacroOnTapMillis(_)
+                | MappingMode::MacroOnDoubleTapMillis(_)
+                | MappingMode::MacroOnHoldMillis(_)
+        )
+    }
+
     pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
             "OnPressUntilRelease" => Some(MappingMode::OnPressUntilRelease),
@@ -298,13 +309,21 @@ pub enum ComputerInput {
 )]
 #[rkyv(derive(Debug))]
 pub enum MouseInput {
+    /// The mouse will scroll up by this many pixels per second
     ScrollUp(i16),
+    /// The mouse will scroll down by this many pixels per second
     ScrollDown(i16),
+    /// The mouse will scroll right by this many pixels per second
     ScrollRight(i16),
+    /// The mouse will scroll left by this many pixels per second
     ScrollLeft(i16),
+    /// The cursor will move up by this many pixels per second
     MoveUp(i16),
+    /// The cursor will move down by this many pixels per second
     MoveDown(i16),
+    /// The cursor will move right by this many pixels per second
     MoveRight(i16),
+    /// The cursor will move left by this many pixels per second
     MoveLeft(i16),
     #[default]
     ClickLeft,
