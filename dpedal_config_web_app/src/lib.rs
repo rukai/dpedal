@@ -202,6 +202,8 @@ async fn write_config(
         for row in ElementChildIter::new(&table).skip(1) {
             let mut cells = ElementChildIter::new(&row);
 
+            let mode = parse_mode_cell(&cells.next().unwrap());
+
             let input_cell: Element = cells.next().unwrap();
             let wrapper = input_cell.children().item(0).unwrap();
             let selects_container = wrapper.children().item(2).unwrap();
@@ -212,11 +214,10 @@ async fn write_config(
                     DpedalInput::from_string(&s.value()).unwrap()
                 },
             ));
-
             let output_sequence = parse_output_cell(&cells.next().unwrap());
             mappings.push(Mapping {
                 input_set: input,
-                mode: MappingMode::OnPressUntilRelease,
+                mode,
                 output_sequence,
             });
         }
@@ -252,6 +253,22 @@ async fn write_config(
     log::info!("config written {:#?}", config);
 
     Ok(())
+}
+
+fn parse_mode_cell(mode_cell: &Element) -> MappingMode {
+    let children = mode_cell.children();
+    let variant_name = children
+        .item(0)
+        .unwrap()
+        .dyn_into::<HtmlSelectElement>()
+        .unwrap()
+        .value();
+    let fields_span = children.item(1).unwrap();
+    let ms_value = ElementChildIter::<HtmlInputElement>::new(&fields_span)
+        .next()
+        .map(|x| x.value())
+        .unwrap_or_default();
+    MappingMode::from_string(&variant_name, &ms_value).unwrap_or_default()
 }
 
 fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS> {
@@ -348,9 +365,10 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     let table: HtmlElement = document.create_element("table");
     table.set_class_name("mapping-table");
     table.set_inner_html(r#"<tr>
-        <th style='width:30%'><abbr title='Each cell contains a series of chorded pedal inputs that must be all held to activate the output cell.'>Input</abbr></th>
+        <th style='width:15em'><abbr title='Controls when the output sequence is triggered.'>Mode</abbr></th>
+        <th style='width:22%'><abbr title='Each cell contains a series of chorded pedal inputs that must be all held to activate the output cell.'>Input</abbr></th>
         <th><abbr title='Each cell contains a series of PC inputs forming a macro.'>Output</abbr></th>
-        <th style='width:4.5em'>Remove</th>
+        <th style='width:4.3em'>Remove</th>
     </tr>"#);
 
     let add_row_button: HtmlElement = document.create_element("button");
@@ -412,6 +430,8 @@ pub fn set_error(document: &Document, error_message: &str) {
 fn create_row(document: &Document, mapping: &Mapping) -> Element {
     let tr: Element = document.create_element("tr");
 
+    tr.append_child(&create_row_mode(document, &mapping.mode))
+        .unwrap();
     tr.append_child(&create_row_input(document, &mapping.input_set))
         .unwrap();
     tr.append_child(&create_row_output(document, &mapping.output_sequence))
@@ -422,8 +442,7 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
     let remove_btn: HtmlElement = document.create_element("button");
     remove_btn.set_inner_text("✖");
     remove_btn.set_title("Remove Row");
-    remove_btn.set_class_name("red-button");
-    remove_btn.style().set_css_text("font-size:2em;");
+    remove_btn.set_class_name("red-button mapping-table-element");
     let tr_clone = tr.clone();
     set_onclick(
         &remove_btn,
@@ -447,6 +466,63 @@ fn create_row(document: &Document, mapping: &Mapping) -> Element {
     tr
 }
 
+fn create_row_mode(document: &Document, mode: &MappingMode) -> Element {
+    let td: Element = document.create_element("td");
+
+    let select: HtmlSelectElement = document.create_element("select");
+    let mut options = String::new();
+    for variant in MappingMode::iter() {
+        let name: &'static str = variant.into();
+        options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
+    }
+    select.set_inner_html(&options);
+    select.set_class_name("mapping-table-element");
+    let mode_name: &'static str = mode.into();
+    select.set_value(mode_name);
+
+    let fields_span: Element = document.create_element("span");
+    setup_mode_fields(&fields_span, mode);
+
+    let select_clone = select.clone();
+    let fields_span_clone = fields_span.clone();
+    set_onchange(
+        &select,
+        Box::new(move || {
+            let dummy = MappingMode::from_string(&select_clone.value(), "500").unwrap_or_default();
+            setup_mode_fields(&fields_span_clone, &dummy);
+        }) as Box<dyn FnMut()>,
+    );
+
+    td.append_child(&select).unwrap();
+    td.append_child(&fields_span).unwrap();
+    td
+}
+
+fn setup_mode_fields(span: &Element, mode: &MappingMode) {
+    let value = match mode {
+        MappingMode::OnHoldMillisUntilRelease(x)
+        | MappingMode::MacroOnTapMillis(x)
+        | MappingMode::MacroOnDoubleTapMillis(x)
+        | MappingMode::MacroOnHoldMillis(x) => Some(*x as i32),
+        _ => None,
+    };
+    clear_children(span);
+    if let Some(x) = value {
+        let document = Document::get();
+        // unlike other fields that appear to the right of the dropdown,
+        // the mode fields are intentionally placed on a newline due to the short fixed width of the mode column
+        let input_field: HtmlInputElement = document.create_element("input");
+        input_field.style().set_css_text("margin-top:4px;");
+        input_field.set_type("number");
+        input_field.set_value(&x.to_string());
+        input_field.set_class_name("mapping-table-element");
+        input_field.set_min("0");
+        input_field.set_max("65535");
+        input_field.set_required(true);
+        span.append_child(&input_field).unwrap();
+    }
+}
+
 fn create_dpedal_input_select(document: &Document, value: &DpedalInput) -> HtmlSelectElement {
     let select: HtmlSelectElement = document.create_element("select");
     let mut options = String::new();
@@ -455,7 +531,7 @@ fn create_dpedal_input_select(document: &Document, value: &DpedalInput) -> HtmlS
         options.push_str(&format!("<option value=\"{name}\">{name}</option>"));
     }
     select.set_inner_html(&options);
-    select.style().set_css_text("font-size:2em;");
+    select.set_class_name("mapping-table-element");
     select.set_value(<&str>::from(value));
     select
 }
@@ -552,7 +628,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
 <option value=\"control\">⚙️</option>
 ",
     );
-    select_type.style().set_css_text("font-size:2em;");
+    select_type.set_class_name("mapping-table-element");
     select_type.set_value(match output {
         ComputerInput::Mouse(_) => "mouse",
         ComputerInput::Keyboard(_) => "keyboard",
@@ -561,7 +637,7 @@ fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     span.append_child(&select_type).unwrap();
 
     let select_subtype: HtmlSelectElement = document.create_element("select");
-    select_subtype.style().set_css_text("font-size:2em;");
+    select_subtype.set_class_name("mapping-table-element");
     span.append_child(&select_subtype).unwrap();
 
     let subtype_fields_span: Element = document.create_element("span");
@@ -667,9 +743,7 @@ fn setup_subtype_fields_mouse(span: &Element, mouse_input: &MouseInput) {
 
 fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
     let value = match control {
-        DPedalControl::AfterMillisecondsHold(x) | DPedalControl::AfterMillisecondsRelease(x) => {
-            Some(*x as i32)
-        }
+        DPedalControl::AfterMillisHold(x) | DPedalControl::AfterMillisRelease(x) => Some(*x as i32),
         DPedalControl::SetProfile(x) => Some(*x as i32),
         DPedalControl::Restart => None,
     };
@@ -683,9 +757,9 @@ fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
         let input_field: HtmlInputElement = document.create_element("input");
         input_field.set_type("number");
         input_field.set_value(&x.to_string());
-        input_field.style().set_css_text("font-size:2em;");
+        input_field.set_class_name("mapping-table-element");
         input_field.set_min("0");
-        input_field.set_max("1000");
+        input_field.set_max("65535");
         input_field.set_required(true);
         span.append_child(&input_field).unwrap();
     }

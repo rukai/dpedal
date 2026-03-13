@@ -151,8 +151,8 @@ impl State {
     fn update(&mut self, event: DPedalControl) -> ControlFlow<()> {
         match event {
             // TODO: implement these controls
-            DPedalControl::AfterMillisecondsHold(_)
-            | DPedalControl::AfterMillisecondsRelease(_)
+            DPedalControl::AfterMillisHold(_)
+            | DPedalControl::AfterMillisRelease(_)
             | DPedalControl::Restart => ControlFlow::Continue(()),
             DPedalControl::SetProfile(profile) => {
                 self.current_profile = profile;

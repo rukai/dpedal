@@ -18,7 +18,7 @@
 
 .chord-container> :not(:first-child)::before {
     content: "+";
-    font-size: 2em;
+    font-size: 1.7em;
     font-weight: bold;
     position: absolute;
     right: 100%;
@@ -27,10 +27,14 @@
 
 .sequence-container> :not(:first-child)::before {
     content: "➜";
-    font-size: 2em;
+    font-size: 1.7em;
     position: absolute;
     right: 100%;
     margin-right: 0.2em;
+}
+
+.mapping-table-element {
+    font-size: 1.7em;
 }
 
 .green-button {
@@ -75,7 +79,7 @@ table {
 }
 
 th {
-    font-size: 1.5em;
+    font-size: 1.4em;
 }
 
 th,
