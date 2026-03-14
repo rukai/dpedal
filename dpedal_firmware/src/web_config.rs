@@ -123,7 +123,7 @@ impl WebConfig {
                     defmt::info!("set config {:?}", array_vec.as_ref());
                     if let Err(()) = self
                         .config_flash
-                        .load_config_bytes_to_flash_and_reload_config(&array_vec)
+                        .store_config_bytes_to_flash_and_reload_config(&array_vec)
                         .await
                     {
                         // TODO: return error over protocol

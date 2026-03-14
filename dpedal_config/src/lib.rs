@@ -9,7 +9,7 @@ pub const PICO_FLASH_SIZE: usize = 1024 * 1024 * 2; // 2 MiB
 pub const FIRMWARE_OFFSET: usize = 0;
 pub const FIRMWARE_SIZE: usize = 1024 * 2000; // 2000 KiB
 pub const CONFIG_OFFSET: usize = 1024 * 2000;
-pub const CONFIG_SIZE: usize = 1024 * 16; // 16 KiB // TODO: This is used to allocate space for config stored under different conditions e.g. serialized by different serialization techniques. At high config usage we could get weird failures. Need to clarify these usages.
+pub const CONFIG_SIZE: usize = 1024 * 12; // 12 KiB // TODO: This is used to allocate space for config stored under different conditions e.g. serialized by different serialization techniques. At high config usage we could get weird failures. Need to clarify these usages.
 
 use arrayvec::{ArrayString, ArrayVec};
 use defmt::Format;
@@ -74,12 +74,186 @@ pub struct PinRemapping {
     pub pin: u32,
 }
 
-pub const MAX_MAPPINGS: usize = 20;
-pub const MAX_COMPUTER_INPUTS: usize = 20;
+pub const MAX_MAPPINGS: usize = 12;
+pub const MAX_COMPUTER_INPUTS: usize = 25;
 #[derive(Archive, Deserialize, Serialize, Debug, PartialEq, Clone)]
 #[rkyv(derive(Debug))]
 pub struct Profile {
     pub mappings: ArrayVec<Mapping, MAX_MAPPINGS>,
+}
+
+impl Profile {
+    pub fn empty() -> Self {
+        Self {
+            mappings: ArrayVec::new(),
+        }
+    }
+
+    pub fn mouse_move() -> Self {
+        Self {
+            mappings: ArrayVec::from_iter([
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadLeft]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::MoveLeft(300),
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadRight]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::MoveRight(300),
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadUp]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::MoveUp(300),
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadDown]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::MoveDown(300),
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::ClickLeft,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
+                        MouseInput::ClickRight,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    mode: MappingMode::OnHold { hold_ms: 2000 },
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Control(
+                        DPedalControl::SetProfile(0),
+                    )]),
+                },
+            ]),
+        }
+    }
+
+    pub fn arrow_keys() -> Self {
+        Self {
+            mappings: ArrayVec::from_iter([
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadLeft]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::LeftArrow,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadRight]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::RightArrow,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadUp]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::UpArrow,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::DpadDown]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::DownArrow,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([
+                        ComputerInput::Keyboard(KeyboardInput::LeftShift),
+                        ComputerInput::Keyboard(KeyboardInput::Tab),
+                    ]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    mode: MappingMode::OnPress,
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
+                        KeyboardInput::Tab,
+                    )]),
+                },
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    mode: MappingMode::OnHold { hold_ms: 2000 },
+                    output_sequence: ArrayVec::from_iter([ComputerInput::Control(
+                        DPedalControl::SetProfile(0),
+                    )]),
+                },
+            ]),
+        }
+    }
+
+    pub fn macro_demo() -> Self {
+        Self {
+            mappings: ArrayVec::from_iter([
+                // Left button: move mouse in a 200px square (at 200px/s, each side takes 1000ms)
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
+                    mode: MappingMode::MacroOnPress,
+                    output_sequence: ArrayVec::from_iter([
+                        ComputerInput::Mouse(MouseInput::MoveRight(500)),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(500)),
+                        ComputerInput::Mouse(MouseInput::MoveDown(500)),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(500)),
+                        ComputerInput::Mouse(MouseInput::MoveLeft(500)),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(500)),
+                        ComputerInput::Mouse(MouseInput::MoveUp(500)),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(500)),
+                    ]),
+                },
+                // Right button: Ctrl+L, type "dpedal.com", Enter
+                Mapping {
+                    input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
+                    mode: MappingMode::MacroOnPress,
+                    output_sequence: ArrayVec::from_iter([
+                        ComputerInput::Keyboard(KeyboardInput::LeftControl),
+                        ComputerInput::Keyboard(KeyboardInput::L),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(100)),
+                        ComputerInput::Keyboard(KeyboardInput::D),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::P),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::E),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::D),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::A),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::L),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::PeriodGreaterThan),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::C),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::O),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::M),
+                        ComputerInput::Control(DPedalControl::AfterMillisRelease(50)),
+                        ComputerInput::Keyboard(KeyboardInput::Enter),
+                    ]),
+                },
+            ]),
+        }
+    }
 }
 
 impl Default for Profile {
