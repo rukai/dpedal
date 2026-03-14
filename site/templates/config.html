@@ -28,7 +28,14 @@ DPedal Config
         </div>
         <div id="mapping-content" hidden style="margin-bottom:2em;">
             <div id="profiles-container"></div>
-            <button id="add-profile" class="green-button">Add Profile</button>
+            <div id="add-profile-buttons" style="display:flex; align-items:center; gap:0.5em; flex-wrap:wrap;">
+                <span>Add Profile:</span>
+                <button id="add-profile-empty" class="green-button">Empty</button>
+                <button id="add-profile-mouse-scroll" class="green-button">Mouse Scroll</button>
+                <button id="add-profile-mouse-move" class="green-button">Mouse Move</button>
+                <button id="add-profile-arrow-keys" class="green-button">Arrow Keys</button>
+                <button id="add-profile-macro-demo" class="green-button">Macro Demo</button>
+            </div>
         </div>
         <div id="save-section" hidden>
             <button id="save" class="green-button" style="padding:0.5em 2em;">Save</button>

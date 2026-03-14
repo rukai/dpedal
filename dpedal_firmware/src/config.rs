@@ -34,9 +34,9 @@ impl ConfigFlash {
     }
 
     async fn load_inner(&mut self) -> Result<(), ()> {
+        let mut config_lock = CONFIG.lock().await;
         let bytes = self.load_config_bytes_from_flash()?;
         let archive = rkyv::api::low::access::<ArchivedConfig, Failure>(&bytes).map_err(|_| ())?;
-        let mut config_lock = CONFIG.lock().await;
         *config_lock = Some(rkyv::api::low::deserialize::<_, Failure>(archive).map_err(|_| ())?);
 
         Ok(())
@@ -67,7 +67,7 @@ impl ConfigFlash {
         Ok(())
     }
 
-    pub async fn load_config_bytes_to_flash_and_reload_config(
+    pub async fn store_config_bytes_to_flash_and_reload_config(
         &mut self,
         bytes: &ArrayVec<u8, CONFIG_SIZE>,
     ) -> Result<(), ()> {
@@ -87,13 +87,15 @@ impl ConfigFlash {
             )
             .unwrap();
 
-        let mut final_bytes: ArrayVec<u8, CONFIG_SIZE> = ArrayVec::from_iter(size.to_be_bytes());
-        final_bytes.extend(bytes.iter().cloned());
-        self.flash
-            .blocking_write(CONFIG_OFFSET as u32, &final_bytes)
-            .unwrap();
-
-        defmt::info!("config of size {} written to flash", size.to_be_bytes());
+        {
+            let mut final_bytes: ArrayVec<u8, CONFIG_SIZE> =
+                ArrayVec::from_iter(size.to_be_bytes());
+            final_bytes.extend(bytes.iter().cloned());
+            self.flash
+                .blocking_write(CONFIG_OFFSET as u32, &final_bytes)
+                .unwrap();
+            defmt::info!("config of size {} written to flash", size.to_be_bytes());
+        } // drop final_bytes before the await so it is not stored in async task state
 
         self.load().await;
 

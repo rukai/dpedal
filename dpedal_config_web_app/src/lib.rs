@@ -112,22 +112,30 @@ async fn open_device(devices: DeviceList) {
     for (i, profile) in config.profiles.iter().enumerate() {
         gen_for_profile(&document, profile, i);
     }
-    update_add_profile_button(&document);
+    update_add_profile_buttons(&document);
     log::info!("device config {:#?}", config);
 
-    set_button_on_click(
-        &document,
-        "add-profile",
-        Box::new(move || {
-            let document = Document::get();
-            let container: Element = document.get_element("profiles-container");
-            let count = container.children().length() as usize;
-            if count < MAX_PROFILES {
-                gen_for_profile(&document, &Profile::default(), count);
-                update_add_profile_button(&document);
-            }
-        }) as Box<dyn FnMut()>,
-    );
+    for (id, preset) in [
+        ("add-profile-empty", Profile::empty()),
+        ("add-profile-mouse-scroll", Profile::default()),
+        ("add-profile-mouse-move", Profile::mouse_move()),
+        ("add-profile-arrow-keys", Profile::arrow_keys()),
+        ("add-profile-macro-demo", Profile::macro_demo()),
+    ] {
+        set_button_on_click(
+            &document,
+            id,
+            Box::new(move || {
+                let document = Document::get();
+                let container: Element = document.get_element("profiles-container");
+                let count = container.children().length() as usize;
+                if count < MAX_PROFILES {
+                    gen_for_profile(&document, &preset, count);
+                    update_add_profile_buttons(&document);
+                }
+            }) as Box<dyn FnMut()>,
+        );
+    }
 
     let preserved = PreservedConfig {
         version: config.version,
@@ -357,7 +365,7 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
             profile_section_clone.remove();
             let document = Document::get();
             renumber_profiles(&document);
-            update_add_profile_button(&document);
+            update_add_profile_buttons(&document);
         }) as Box<dyn FnMut()>,
     );
     header_row.append_child(&remove_button).unwrap();
@@ -402,14 +410,18 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     profiles_container.append_child(&profile_section).unwrap();
 }
 
-fn update_add_profile_button(document: &Document) {
+fn update_add_profile_buttons(document: &Document) {
     let container: Element = document.get_element("profiles-container");
     let count = container.children().length() as usize;
-    let add_button: HtmlElement = document.get_element("add-profile");
-    if count < MAX_PROFILES {
-        add_button.remove_attribute("disabled").unwrap();
-    } else {
-        add_button.set_attribute("disabled", "").unwrap();
+    let buttons_div: Element = document.get_element("add-profile-buttons");
+    for button in ElementChildIter::<HtmlElement>::new(&buttons_div) {
+        if button.tag_name() == "BUTTON" {
+            if count < MAX_PROFILES {
+                button.remove_attribute("disabled").unwrap();
+            } else {
+                button.set_attribute("disabled", "").unwrap();
+            }
+        }
     }
 }
 
