@@ -82,9 +82,8 @@ impl Inputs {
 
                 for (i, mapping) in profile.mappings.iter().enumerate() {
                     let all_pressed = input_state.is_all_pressed(&mapping.input_set);
-                    let outputs = &mapping.output_sequence[..];
                     state.mapping_states[i] = match state.mapping_states[i]
-                        .process(mapping, outputs, all_pressed, &mut state)
+                        .process(mapping, all_pressed, &mut state)
                         .await
                     {
                         ControlFlow::Continue(ms) => ms,

@@ -9,23 +9,25 @@ use crate::input::State;
 #[derive(Clone, Copy)]
 pub struct MappingState {
     phase: MappingPhase,
+    output: Option<RunningOutputSequence>,
+}
+
+#[derive(Clone, Copy)]
+struct RunningOutputSequence {
     /// Index of the next output_sequence item to process.
     output_index: u8,
     /// Index of the first currently-held output. Items in held_from..output_index are "active".
     /// Updated when AfterMillisRelease releases a segment.
     held_from: u8,
-    /// Set when advance_outputs parks at an AfterMillis* control.
-    /// Cleared when the timer expires or the sequence is cancelled.
-    waiting_since: Option<Instant>,
+    /// Set at creation and reset to Instant::now() each time an AfterMillis* timer expires.
+    waiting_since: Instant,
 }
 
 impl MappingState {
     pub fn new() -> Self {
         MappingState {
             phase: MappingPhase::Released,
-            output_index: 0,
-            held_from: 0,
-            waiting_since: None,
+            output: None,
         }
     }
 
@@ -35,37 +37,27 @@ impl MappingState {
     pub async fn process(
         mut self,
         mapping: &Mapping,
-        outputs: &[ComputerInput],
         all_pressed: bool,
         state: &mut State,
     ) -> ControlFlow<(), MappingState> {
-        // Shared sequence-processing transition: continue advancing OutputsActive
-        // sequences (including those parked at an AfterMillis* timer).
-        self.advance_outputs(outputs, state).await?;
+        // progress the phase state machine
+        self.process_phase(mapping, all_pressed).await;
 
-        // Mode-specific state machine transitions
-        // For macro modes with completed sequence: release and transition
-        if mapping.mode.is_macro() {
-            self.phase = match self.phase {
-                MappingPhase::OutputsActive if (self.output_index as usize) >= outputs.len() => {
-                    self.release_held(outputs).await;
-                    match mapping.mode {
-                        MappingMode::MacroOnRelease => MappingPhase::Released,
-                        _ => MappingPhase::AwaitingRelease,
-                    }
-                }
-                _ => self.phase,
-            };
-        }
+        // output sequences are run independently of the phase state machine
+        self.process_output_sequence(mapping, state).await?;
 
+        ControlFlow::Continue(self)
+    }
+
+    async fn process_phase(&mut self, mapping: &Mapping, all_pressed: bool) {
         self.phase = match mapping.mode {
             MappingMode::OnPressUntilRelease => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => {
-                    self.start_outputs(outputs, state).await?;
-                    MappingPhase::OutputsActive
+                    self.start_outputs();
+                    MappingPhase::Pressed
                 }
-                (MappingPhase::OutputsActive, false) => {
-                    self.release_held(outputs).await;
+                (MappingPhase::Pressed, false) => {
+                    self.stop_outputs(mapping).await;
                     MappingPhase::Released
                 }
                 (other, _) => other,
@@ -77,15 +69,15 @@ impl MappingState {
                 },
                 (MappingPhase::HeldPending { since }, true) => {
                     if since.elapsed().as_millis() >= threshold as u64 {
-                        self.start_outputs(outputs, state).await?;
-                        MappingPhase::OutputsActive
+                        self.start_outputs();
+                        MappingPhase::Pressed
                     } else {
                         self.phase
                     }
                 }
                 (MappingPhase::HeldPending { .. }, false) => MappingPhase::Released,
-                (MappingPhase::OutputsActive, false) => {
-                    self.release_held(outputs).await;
+                (MappingPhase::Pressed, false) => {
+                    self.stop_outputs(mapping).await;
                     MappingPhase::Released
                 }
                 (other, _) => other,
@@ -93,16 +85,12 @@ impl MappingState {
 
             MappingMode::Toggle => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => {
-                    self.start_outputs(outputs, state).await?;
-                    if (self.output_index as usize) >= outputs.len() {
-                        MappingPhase::ToggleOnAwaitingRelease
-                    } else {
-                        MappingPhase::OutputsActive
-                    }
+                    self.start_outputs();
+                    MappingPhase::ToggleOnAwaitingRelease
                 }
-                (MappingPhase::ToggleOnAwaitingRelease, false) => MappingPhase::OutputsActive,
-                (MappingPhase::OutputsActive, true) => {
-                    self.release_held(outputs).await;
+                (MappingPhase::ToggleOnAwaitingRelease, false) => MappingPhase::Pressed,
+                (MappingPhase::Pressed, true) => {
+                    self.stop_outputs(mapping).await;
                     MappingPhase::AwaitingRelease
                 }
                 (MappingPhase::AwaitingRelease, false) => MappingPhase::Released,
@@ -111,18 +99,18 @@ impl MappingState {
 
             MappingMode::MacroOnPress => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => {
-                    self.start_outputs(outputs, state).await?;
-                    MappingPhase::OutputsActive
+                    self.start_outputs();
+                    MappingPhase::Pressed
                 }
-                (MappingPhase::AwaitingRelease, false) => MappingPhase::Released,
+                (MappingPhase::Pressed, false) => MappingPhase::Released,
                 (other, _) => other,
             },
 
             MappingMode::MacroOnRelease => match (self.phase, all_pressed) {
-                (MappingPhase::Released, true) => MappingPhase::MacroOnReleaseArmed,
-                (MappingPhase::MacroOnReleaseArmed, false) => {
-                    self.start_outputs(outputs, state).await?;
-                    MappingPhase::OutputsActive
+                (MappingPhase::Released, true) => MappingPhase::Pressed,
+                (MappingPhase::Pressed, false) => {
+                    self.start_outputs();
+                    MappingPhase::Released
                 }
                 (other, _) => other,
             },
@@ -139,8 +127,8 @@ impl MappingState {
                     }
                 }
                 (MappingPhase::HeldPending { .. }, false) => {
-                    self.start_outputs(outputs, state).await?;
-                    MappingPhase::OutputsActive
+                    self.start_outputs();
+                    MappingPhase::Released
                 }
                 (MappingPhase::AwaitingRelease, false) => MappingPhase::Released,
                 (other, _) => other,
@@ -157,9 +145,9 @@ impl MappingState {
                         self.phase
                     }
                 }
-                (MappingPhase::HeldPending { since }, false) => {
-                    MappingPhase::DoubleTapGap { since }
-                }
+                (MappingPhase::HeldPending { .. }, false) => MappingPhase::DoubleTapGap {
+                    since: Instant::now(),
+                },
                 (MappingPhase::DoubleTapGap { since }, false) => {
                     if since.elapsed().as_millis() >= threshold as u64 {
                         MappingPhase::Released
@@ -167,9 +155,9 @@ impl MappingState {
                         self.phase
                     }
                 }
-                (MappingPhase::DoubleTapGap { since }, true) => {
-                    MappingPhase::DoubleTapSecondPressed { since }
-                }
+                (MappingPhase::DoubleTapGap { .. }, true) => MappingPhase::DoubleTapSecondPressed {
+                    since: Instant::now(),
+                },
                 (MappingPhase::DoubleTapSecondPressed { since }, true) => {
                     if since.elapsed().as_millis() >= threshold as u64 {
                         MappingPhase::AwaitingRelease
@@ -178,8 +166,8 @@ impl MappingState {
                     }
                 }
                 (MappingPhase::DoubleTapSecondPressed { .. }, false) => {
-                    self.start_outputs(outputs, state).await?;
-                    MappingPhase::OutputsActive
+                    self.start_outputs();
+                    MappingPhase::Released
                 }
                 (MappingPhase::AwaitingRelease, false) => MappingPhase::Released,
                 (other, _) => other,
@@ -191,8 +179,8 @@ impl MappingState {
                 },
                 (MappingPhase::HeldPending { since }, true) => {
                     if since.elapsed().as_millis() >= threshold as u64 {
-                        self.start_outputs(outputs, state).await?;
-                        MappingPhase::OutputsActive
+                        self.start_outputs();
+                        MappingPhase::AwaitingRelease
                     } else {
                         self.phase
                     }
@@ -202,112 +190,112 @@ impl MappingState {
                 (other, _) => other,
             },
         };
-
-        ControlFlow::Continue(self)
     }
 
-    /// If in OutputsActive phase with items remaining, advance the output sequence one step.
-    /// Returns Break if SetProfile fired (caller must `continue 'main_loop`).
-    async fn advance_outputs(
+    /// Process the output sequence in chunks terminated by DPedalControl::AfterMillis*
+    async fn process_output_sequence(
         &mut self,
-        outputs: &[ComputerInput],
+        mapping: &Mapping,
         state: &mut State,
     ) -> ControlFlow<()> {
-        if let MappingPhase::OutputsActive = self.phase
-            && (self.output_index as usize) < outputs.len()
-        {
-            return self.run_sequence(outputs, state).await;
-        }
-        ControlFlow::Continue(())
-    }
+        if let Some(output) = self.output.as_mut() {
+            while (output.output_index as usize) < mapping.output_sequence.len() {
+                match &mapping.output_sequence[output.output_index as usize] {
+                    ComputerInput::Keyboard(key) => {
+                        KEYBOARD_CHANNEL.send(KeyboardEvent::Pressed(*key)).await;
+                        output.output_index += 1;
+                    }
+                    ComputerInput::Mouse(mouse) => {
+                        MOUSE_CHANNEL.send(MouseEvent::Pressed(*mouse)).await;
+                        output.output_index += 1;
+                    }
+                    ComputerInput::Control(DPedalControl::AfterMillisHold(millis)) => {
+                        let millis = *millis;
+                        if output.waiting_since.elapsed().as_millis() < millis as u64 {
+                            return ControlFlow::Continue(());
+                        }
+                        // Timer expired, proceed but do not release held inputs
+                        output.waiting_since = Instant::now();
+                        output.output_index += 1;
+                    }
+                    ComputerInput::Control(DPedalControl::AfterMillisRelease(millis)) => {
+                        let millis = *millis;
+                        if output.waiting_since.elapsed().as_millis() < millis as u64 {
+                            return ControlFlow::Continue(());
+                        }
+                        // Timer expired, proceed and release held inputs
+                        MappingState::release_held(output, mapping).await;
+                        output.held_from = output.output_index + 1;
+                        output.waiting_since = Instant::now();
+                        output.output_index += 1;
+                    }
+                    ComputerInput::Control(DPedalControl::Restart) => {
+                        MappingState::release_held(output, mapping).await;
+                        output.output_index = 0;
+                        output.held_from = 0;
+                        output.waiting_since = Instant::now();
+                        return ControlFlow::Continue(());
+                    }
+                    ComputerInput::Control(DPedalControl::SetProfile(profile)) => {
+                        let profile = *profile;
 
-    /// Process the output_sequence starting from output_index, pressing keyboard/mouse items
-    /// until hitting an AfterMillis* control (timer not yet expired), Restart, SetProfile,
-    /// or the end of the sequence. AfterMillis* timer state is stored in waiting_since.
-    async fn run_sequence(
-        &mut self,
-        outputs: &[ComputerInput],
-        state: &mut State,
-    ) -> ControlFlow<()> {
-        while (self.output_index as usize) < outputs.len() {
-            match &outputs[self.output_index as usize] {
-                ComputerInput::Keyboard(key) => {
-                    KEYBOARD_CHANNEL.send(KeyboardEvent::Pressed(*key)).await;
-                    self.output_index += 1;
-                }
-                ComputerInput::Mouse(mouse) => {
-                    MOUSE_CHANNEL.send(MouseEvent::Pressed(*mouse)).await;
-                    self.output_index += 1;
-                }
-                ComputerInput::Control(DPedalControl::AfterMillisHold(millis)) => {
-                    let millis = *millis;
-                    let since = match self.waiting_since {
-                        Some(s) => s,
-                        None => {
-                            self.waiting_since = Some(Instant::now());
-                            return ControlFlow::Continue(());
-                        }
-                    };
-                    if since.elapsed().as_millis() < millis as u64 {
-                        return ControlFlow::Continue(());
+                        state.current_profile = profile;
+
+                        // after setting the profile we have invalidated all our state,
+                        // so we need to clear mapping state and skip further processing
+                        state.mapping_states.clear();
+                        return ControlFlow::Break(());
                     }
-                    // Timer expired; keep previously held items held (held_from unchanged).
-                    self.waiting_since = None;
-                    self.output_index += 1;
                 }
-                ComputerInput::Control(DPedalControl::AfterMillisRelease(millis)) => {
-                    let millis = *millis;
-                    let since = match self.waiting_since {
-                        Some(s) => s,
-                        None => {
-                            self.waiting_since = Some(Instant::now());
-                            return ControlFlow::Continue(());
-                        }
-                    };
-                    if since.elapsed().as_millis() < millis as u64 {
-                        return ControlFlow::Continue(());
-                    }
-                    // Timer expired; release outputs[held_from..output_index].
-                    let start = self.held_from as usize;
-                    let end = self.output_index as usize;
-                    for output in &outputs[start..end] {
-                        match output {
-                            ComputerInput::Keyboard(key) => {
-                                KEYBOARD_CHANNEL.send(KeyboardEvent::Released(*key)).await;
-                            }
-                            ComputerInput::Mouse(mouse) => {
-                                MOUSE_CHANNEL.send(MouseEvent::Released(*mouse)).await;
-                            }
-                            ComputerInput::Control(_) => {}
-                        }
-                    }
-                    self.held_from = self.output_index + 1;
-                    self.waiting_since = None;
-                    self.output_index += 1;
+            }
+
+            // terminate macros when the sequence comes to an end.
+            if mapping.mode.is_macro()
+                && output.output_index as usize >= mapping.output_sequence.len()
+                && let Some(last_output) = mapping.output_sequence.last()
+            {
+                // The user configured an AfterMillis as the last output,
+                // so a wait has already occured for the last output and we can stop immediately
+                if let ComputerInput::Control(
+                    DPedalControl::AfterMillisHold(_) | DPedalControl::AfterMillisRelease(_),
+                ) = last_output
+                {
+                    self.stop_outputs(mapping).await;
                 }
-                ComputerInput::Control(DPedalControl::Restart) => {
-                    self.output_index = 0;
-                    self.held_from = 0;
-                    return ControlFlow::Continue(());
-                }
-                ComputerInput::Control(DPedalControl::SetProfile(profile)) => {
-                    let profile = *profile;
-                    self.output_index += 1;
-                    state.current_profile = profile;
-                    state.mapping_states.clear();
-                    return ControlFlow::Break(());
+                // If the mapping is not configured with a final DpedalControl::AfterMillis* then wait for 50ms,
+                // This is a little magic but gives the user a reasonable experience by ensuring the final output is triggered.
+                else if output.waiting_since.elapsed().as_millis() > 50 {
+                    self.stop_outputs(mapping).await;
                 }
             }
         }
         ControlFlow::Continue(())
     }
 
-    /// Release keyboard/mouse items in outputs[held_from..output_index].
-    /// Resets output_index, held_from, and waiting_since to their zero/None values.
-    async fn release_held(&mut self, outputs: &[ComputerInput]) {
-        let start = self.held_from as usize;
-        let end = (self.output_index as usize).min(outputs.len());
-        for output in &outputs[start..end] {
+    /// Start the output_sequence
+    fn start_outputs(&mut self) {
+        // if macros are still running, just leave them running
+        if self.output.is_none() {
+            self.output = Some(RunningOutputSequence {
+                output_index: 0,
+                held_from: 0,
+                waiting_since: Instant::now(),
+            });
+        }
+    }
+
+    /// Send release events for all unreleased inputs.
+    /// Also the output_sequence is terminated, so any remaining elements in the sequence are skipped
+    async fn stop_outputs(&mut self, mapping: &Mapping) {
+        if let Some(mut output) = self.output.take() {
+            MappingState::release_held(&mut output, mapping).await;
+        }
+    }
+
+    async fn release_held(output: &mut RunningOutputSequence, mapping: &Mapping) {
+        let start = output.held_from as usize;
+        let end = (output.output_index as usize).min(mapping.output_sequence.len());
+        for output in &mapping.output_sequence[start..end] {
             match output {
                 ComputerInput::Keyboard(key) => {
                     KEYBOARD_CHANNEL.send(KeyboardEvent::Released(*key)).await;
@@ -318,39 +306,21 @@ impl MappingState {
                 ComputerInput::Control(_) => {}
             }
         }
-        self.output_index = 0;
-        self.held_from = 0;
-        self.waiting_since = None;
-    }
-
-    /// Reset output_index and held_from to 0, then run the output sequence.
-    async fn start_outputs(
-        &mut self,
-        outputs: &[ComputerInput],
-        state: &mut State,
-    ) -> ControlFlow<()> {
-        self.output_index = 0;
-        self.held_from = 0;
-        self.run_sequence(outputs, state).await
     }
 }
 
 #[derive(Clone, Copy)]
 enum MappingPhase {
-    /// Idle. No inputs held, no pending activity.
+    /// The input is currently considered released.
     Released,
-    /// Inputs held, timing started. Used by hold/tap/double-tap modes.
+    /// The input is currently considered held since the Instant.
     HeldPending { since: Instant },
-    /// Outputs are being pressed / held. If output_index < sequence length,
-    /// advance_outputs will be called each tick to continue processing
-    /// (including waiting for an AfterMillis* timer stored in MappingState.waiting_since).
-    OutputsActive,
+    /// The input is currently considered pressed.
+    Pressed,
     /// Toggle activated, waiting for physical release before accepting next toggle press.
     ToggleOnAwaitingRelease,
     /// Waiting for full release before returning to Released.
     AwaitingRelease,
-    /// MacroOnRelease: inputs pressed, will fire macro on release.
-    MacroOnReleaseArmed,
     /// DoubleTap: first tap complete, awaiting second press.
     DoubleTapGap { since: Instant },
     /// DoubleTap: second press, awaiting second release to fire.
