@@ -1,15 +1,8 @@
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
-use web_sys::Element;
 use web_sys::HtmlElement;
 
 use crate::document::Document;
-
-pub(crate) fn clear_children(el: &Element) {
-    while let Some(child) = el.first_element_child() {
-        child.remove();
-    }
-}
 
 pub(crate) fn set_button_on_click(document: &Document, id: &str, closure: Box<dyn FnMut()>) {
     let button: HtmlElement = document.get_element(id);

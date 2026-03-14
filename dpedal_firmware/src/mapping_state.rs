@@ -51,7 +51,7 @@ impl MappingState {
 
     async fn process_phase(&mut self, mapping: &Mapping, all_pressed: bool) {
         self.phase = match mapping.mode {
-            MappingMode::OnPressUntilRelease => match (self.phase, all_pressed) {
+            MappingMode::OnPress => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => {
                     self.start_outputs();
                     MappingPhase::Pressed
@@ -63,7 +63,7 @@ impl MappingState {
                 (other, _) => other,
             },
 
-            MappingMode::OnHoldMillisUntilRelease(threshold) => match (self.phase, all_pressed) {
+            MappingMode::OnHold { hold_ms: threshold } => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => MappingPhase::HeldPending {
                     since: Instant::now(),
                 },
@@ -115,7 +115,7 @@ impl MappingState {
                 (other, _) => other,
             },
 
-            MappingMode::MacroOnTapMillis(threshold) => match (self.phase, all_pressed) {
+            MappingMode::MacroOnTap { tap_ms: threshold } => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => MappingPhase::HeldPending {
                     since: Instant::now(),
                 },
@@ -134,46 +134,50 @@ impl MappingState {
                 (other, _) => other,
             },
 
-            MappingMode::MacroOnDoubleTapMillis(threshold) => match (self.phase, all_pressed) {
-                (MappingPhase::Released, true) => MappingPhase::HeldPending {
-                    since: Instant::now(),
-                },
-                (MappingPhase::HeldPending { since }, true) => {
-                    if since.elapsed().as_millis() >= threshold as u64 {
-                        MappingPhase::AwaitingRelease
-                    } else {
-                        self.phase
+            MappingMode::MacroOnDoubleTap { tap_ms: threshold } => {
+                match (self.phase, all_pressed) {
+                    (MappingPhase::Released, true) => MappingPhase::HeldPending {
+                        since: Instant::now(),
+                    },
+                    (MappingPhase::HeldPending { since }, true) => {
+                        if since.elapsed().as_millis() >= threshold as u64 {
+                            MappingPhase::AwaitingRelease
+                        } else {
+                            self.phase
+                        }
                     }
-                }
-                (MappingPhase::HeldPending { .. }, false) => MappingPhase::DoubleTapGap {
-                    since: Instant::now(),
-                },
-                (MappingPhase::DoubleTapGap { since }, false) => {
-                    if since.elapsed().as_millis() >= threshold as u64 {
+                    (MappingPhase::HeldPending { .. }, false) => MappingPhase::DoubleTapGap {
+                        since: Instant::now(),
+                    },
+                    (MappingPhase::DoubleTapGap { since }, false) => {
+                        if since.elapsed().as_millis() >= threshold as u64 {
+                            MappingPhase::Released
+                        } else {
+                            self.phase
+                        }
+                    }
+                    (MappingPhase::DoubleTapGap { .. }, true) => {
+                        MappingPhase::DoubleTapSecondPressed {
+                            since: Instant::now(),
+                        }
+                    }
+                    (MappingPhase::DoubleTapSecondPressed { since }, true) => {
+                        if since.elapsed().as_millis() >= threshold as u64 {
+                            MappingPhase::AwaitingRelease
+                        } else {
+                            self.phase
+                        }
+                    }
+                    (MappingPhase::DoubleTapSecondPressed { .. }, false) => {
+                        self.start_outputs();
                         MappingPhase::Released
-                    } else {
-                        self.phase
                     }
+                    (MappingPhase::AwaitingRelease, false) => MappingPhase::Released,
+                    (other, _) => other,
                 }
-                (MappingPhase::DoubleTapGap { .. }, true) => MappingPhase::DoubleTapSecondPressed {
-                    since: Instant::now(),
-                },
-                (MappingPhase::DoubleTapSecondPressed { since }, true) => {
-                    if since.elapsed().as_millis() >= threshold as u64 {
-                        MappingPhase::AwaitingRelease
-                    } else {
-                        self.phase
-                    }
-                }
-                (MappingPhase::DoubleTapSecondPressed { .. }, false) => {
-                    self.start_outputs();
-                    MappingPhase::Released
-                }
-                (MappingPhase::AwaitingRelease, false) => MappingPhase::Released,
-                (other, _) => other,
-            },
+            }
 
-            MappingMode::MacroOnHoldMillis(threshold) => match (self.phase, all_pressed) {
+            MappingMode::MacroOnHold { hold_ms: threshold } => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => MappingPhase::HeldPending {
                     since: Instant::now(),
                 },
