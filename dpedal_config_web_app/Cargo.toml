@@ -36,6 +36,7 @@ features = [
   'HtmlSelectElement',
   'Node',
   'NodeList',
+  'Text',
   'Window',
   'Document',
   'CssStyleDeclaration'

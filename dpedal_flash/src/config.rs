@@ -188,7 +188,7 @@ impl KdlConfig for MappingKdl {
                 };
 
                 let output = match ty {
-                    "mouse" => match MouseInput::from_string(sub_ty, "10") {
+                    "mouse" => match MouseInput::from_string(sub_ty, "20") {
                         Some(input) => ComputerInput::Mouse(input),
                         None => {
                             diagnostics.push(ParseDiagnostic {

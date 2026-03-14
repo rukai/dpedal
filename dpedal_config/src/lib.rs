@@ -171,9 +171,9 @@ pub enum MappingMode {
     #[default]
     OnPressUntilRelease,
 
-    /// The output_sequence is triggered on an input_set hold that lasts longer than u16 milliseconds
+    /// The output_sequence is triggered on an input_set hold that lasts longer than hold_ms
     /// The output_sequence is terminated on input_set release or the output_sequence reaches its end
-    OnHoldMillisUntilRelease(u16),
+    OnHoldUntilRelease { hold_ms: u16 },
 
     /// The output_sequence is triggered on an input_set press
     /// The output_sequence is terminated on the next input_set press
@@ -189,20 +189,20 @@ pub enum MappingMode {
     /// input_set events that occur while the output_sequence is still running have no effect
     MacroOnRelease,
 
-    /// The output_sequence is triggered when an input_set press and then release occur within u16 milliseconds
+    /// The output_sequence is triggered when an input_set press and then release occur within tap_ms
     /// The output_sequence is terminated when the output_sequence reaches its end
     /// input_set events that occur while the output_sequence is still running have no effect
-    MacroOnTapMillis(u16),
+    MacroOnTap { tap_ms: u16 },
 
-    /// The output_sequence is triggered when an input_set press and then release and then press and then release occurs within u16 milliseconds
+    /// The output_sequence is triggered when an input_set press and then release and then press and then release occurs within tap_ms
     /// The output_sequence is terminated when the output_sequence reaches its end
     /// input_set events that occur while the output_sequence is still running have no effect
-    MacroOnDoubleTapMillis(u16),
+    MacroOnDoubleTap { tap_ms: u16 },
 
-    /// The output_sequence is triggered on an input_set hold that lasts longer than u16 milliseconds
+    /// The output_sequence is triggered on an input_set hold that lasts longer than hold_ms
     /// The output_sequence is terminated when the output_sequence reaches its end
     /// input_set events that occur while the output_sequence is still running have no effect
-    MacroOnHoldMillis(u16),
+    MacroOnHold { hold_ms: u16 },
 }
 
 impl MappingMode {
@@ -211,26 +211,30 @@ impl MappingMode {
             self,
             MappingMode::MacroOnPress
                 | MappingMode::MacroOnRelease
-                | MappingMode::MacroOnTapMillis(_)
-                | MappingMode::MacroOnDoubleTapMillis(_)
-                | MappingMode::MacroOnHoldMillis(_)
+                | MappingMode::MacroOnTap { .. }
+                | MappingMode::MacroOnDoubleTap { .. }
+                | MappingMode::MacroOnHold { .. }
         )
     }
 
     pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
             "OnPressUntilRelease" => Some(MappingMode::OnPressUntilRelease),
-            "OnHoldMillisUntilRelease" => {
-                Some(MappingMode::OnHoldMillisUntilRelease(value.parse().ok()?))
-            }
+            "OnHoldUntilRelease" => Some(MappingMode::OnHoldUntilRelease {
+                hold_ms: value.parse().ok()?,
+            }),
             "Toggle" => Some(MappingMode::Toggle),
             "MacroOnPress" => Some(MappingMode::MacroOnPress),
             "MacroOnRelease" => Some(MappingMode::MacroOnRelease),
-            "MacroOnTapMillis" => Some(MappingMode::MacroOnTapMillis(value.parse().ok()?)),
-            "MacroOnDoubleTapMillis" => {
-                Some(MappingMode::MacroOnDoubleTapMillis(value.parse().ok()?))
-            }
-            "MacroOnHoldMillis" => Some(MappingMode::MacroOnHoldMillis(value.parse().ok()?)),
+            "MacroOnTap" => Some(MappingMode::MacroOnTap {
+                tap_ms: value.parse().ok()?,
+            }),
+            "MacroOnDoubleTap" => Some(MappingMode::MacroOnDoubleTap {
+                tap_ms: value.parse().ok()?,
+            }),
+            "MacroOnHold" => Some(MappingMode::MacroOnHold {
+                hold_ms: value.parse().ok()?,
+            }),
             _ => None,
         }
     }
