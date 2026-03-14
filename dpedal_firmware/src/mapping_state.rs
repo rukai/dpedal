@@ -51,7 +51,7 @@ impl MappingState {
 
     async fn process_phase(&mut self, mapping: &Mapping, all_pressed: bool) {
         self.phase = match mapping.mode {
-            MappingMode::OnPressUntilRelease => match (self.phase, all_pressed) {
+            MappingMode::OnPress => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => {
                     self.start_outputs();
                     MappingPhase::Pressed
@@ -63,27 +63,25 @@ impl MappingState {
                 (other, _) => other,
             },
 
-            MappingMode::OnHoldUntilRelease { hold_ms: threshold } => {
-                match (self.phase, all_pressed) {
-                    (MappingPhase::Released, true) => MappingPhase::HeldPending {
-                        since: Instant::now(),
-                    },
-                    (MappingPhase::HeldPending { since }, true) => {
-                        if since.elapsed().as_millis() >= threshold as u64 {
-                            self.start_outputs();
-                            MappingPhase::Pressed
-                        } else {
-                            self.phase
-                        }
+            MappingMode::OnHold { hold_ms: threshold } => match (self.phase, all_pressed) {
+                (MappingPhase::Released, true) => MappingPhase::HeldPending {
+                    since: Instant::now(),
+                },
+                (MappingPhase::HeldPending { since }, true) => {
+                    if since.elapsed().as_millis() >= threshold as u64 {
+                        self.start_outputs();
+                        MappingPhase::Pressed
+                    } else {
+                        self.phase
                     }
-                    (MappingPhase::HeldPending { .. }, false) => MappingPhase::Released,
-                    (MappingPhase::Pressed, false) => {
-                        self.stop_outputs(mapping).await;
-                        MappingPhase::Released
-                    }
-                    (other, _) => other,
                 }
-            }
+                (MappingPhase::HeldPending { .. }, false) => MappingPhase::Released,
+                (MappingPhase::Pressed, false) => {
+                    self.stop_outputs(mapping).await;
+                    MappingPhase::Released
+                }
+                (other, _) => other,
+            },
 
             MappingMode::Toggle => match (self.phase, all_pressed) {
                 (MappingPhase::Released, true) => {

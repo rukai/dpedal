@@ -247,7 +247,7 @@ impl KdlConfig for MappingKdl {
                 Parsed {
                     value: MappingKdl {
                         input_set: input,
-                        mode: MappingMode::OnPressUntilRelease,
+                        mode: MappingMode::OnPress,
                         output_sequence,
                     },
                     full_span: node.span(),

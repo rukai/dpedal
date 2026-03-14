@@ -88,42 +88,42 @@ impl Default for Profile {
             mappings: ArrayVec::from_iter([
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadLeft]),
-                    mode: MappingMode::OnPressUntilRelease,
+                    mode: MappingMode::OnPress,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
                         MouseInput::ScrollLeft(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadRight]),
-                    mode: MappingMode::OnPressUntilRelease,
+                    mode: MappingMode::OnPress,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
                         MouseInput::ScrollRight(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadUp]),
-                    mode: MappingMode::OnPressUntilRelease,
+                    mode: MappingMode::OnPress,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
                         MouseInput::ScrollUp(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::DpadDown]),
-                    mode: MappingMode::OnPressUntilRelease,
+                    mode: MappingMode::OnPress,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Mouse(
                         MouseInput::ScrollDown(20),
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::ButtonLeft]),
-                    mode: MappingMode::OnPressUntilRelease,
+                    mode: MappingMode::OnPress,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
                         KeyboardInput::PageUp,
                     )]),
                 },
                 Mapping {
                     input_set: ArrayVec::from_iter([DpedalInput::ButtonRight]),
-                    mode: MappingMode::OnPressUntilRelease,
+                    mode: MappingMode::OnPress,
                     output_sequence: ArrayVec::from_iter([ComputerInput::Keyboard(
                         KeyboardInput::PageDown,
                     )]),
@@ -169,11 +169,11 @@ pub enum MappingMode {
     /// The output_sequence is triggered on input_set press
     /// The output_sequence is terminated on input_set release or the output_sequence reaches its end
     #[default]
-    OnPressUntilRelease,
+    OnPress,
 
     /// The output_sequence is triggered on an input_set hold that lasts longer than hold_ms
     /// The output_sequence is terminated on input_set release or the output_sequence reaches its end
-    OnHoldUntilRelease { hold_ms: u16 },
+    OnHold { hold_ms: u16 },
 
     /// The output_sequence is triggered on an input_set press
     /// The output_sequence is terminated on the next input_set press
@@ -219,8 +219,8 @@ impl MappingMode {
 
     pub fn from_string(s: &str, value: &str) -> Option<Self> {
         match s {
-            "OnPressUntilRelease" => Some(MappingMode::OnPressUntilRelease),
-            "OnHoldUntilRelease" => Some(MappingMode::OnHoldUntilRelease {
+            "OnPress" => Some(MappingMode::OnPress),
+            "OnHold" => Some(MappingMode::OnHold {
                 hold_ms: value.parse().ok()?,
             }),
             "Toggle" => Some(MappingMode::Toggle),

@@ -37,7 +37,7 @@ use web_sys::HtmlSelectElement;
 use crate::add_remove_buttons::AddRemoveButtons;
 use crate::device::{Device, DeviceList};
 use crate::document::Document;
-use crate::dom_helpers::{clear_children, set_button_on_click, set_onchange, set_onclick};
+use crate::dom_helpers::{set_button_on_click, set_onchange, set_onclick};
 
 mod add_remove_buttons;
 mod device;
@@ -96,7 +96,7 @@ async fn open_device(devices: DeviceList) {
 
     // Clear previous state for re-open case
     let profiles_container: Element = document.get_element("profiles-container");
-    clear_children(&profiles_container);
+    profiles_container.set_inner_html("");
     let save_result: Element = document.get_element("save-result");
     save_result.set_text_content(None);
 
@@ -365,9 +365,9 @@ fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {
     let table: HtmlElement = document.create_element("table");
     table.set_class_name("mapping-table");
     table.set_inner_html(r#"<tr>
-        <th style='width:13em'><abbr title='Controls when the output sequence is triggered.'>Mode</abbr></th>
+        <th style='width:12.5em'><abbr title='Controls when the output column is triggered. non-macro modes will automatically release the output column when the input is in a certain state (e.g. when the input is realeased), but macro modes will continue until the output column has completed.'>Mode</abbr></th>
         <th style='width:22%'><abbr title='Each cell contains a series of chorded pedal inputs that must be all held to activate the output cell.'>Input</abbr></th>
-        <th><abbr title='Each cell contains a series of PC inputs forming a macro.'>Output</abbr></th>
+        <th><abbr title='Each cell contains a series of PC inputs forming a macro. Use ⚙️ -> AfterMillisRelease inside macros to split up the macro into sections and set how long each section lasts.'>Output</abbr></th>
         <th style='width:4.3em'>Remove</th>
     </tr>"#);
 
@@ -505,19 +505,19 @@ fn create_row_mode(document: &Document, mode: &MappingMode) -> Element {
 
 fn setup_mode_fields(span: &Element, mode: &MappingMode) {
     let value_and_label = match mode {
-        MappingMode::OnHoldUntilRelease { hold_ms } => Some((*hold_ms as i32, "hold for")),
+        MappingMode::OnHold { hold_ms } => Some((*hold_ms as i32, "hold for")),
         MappingMode::MacroOnTap { tap_ms } | MappingMode::MacroOnDoubleTap { tap_ms } => {
             Some((*tap_ms as i32, "tap within"))
         }
         MappingMode::MacroOnHold { hold_ms } => Some((*hold_ms as i32, "hold for")),
         _ => None,
     };
-    clear_children(span);
+    span.set_inner_html("");
     if let Some((x, label)) = value_and_label {
         let document = Document::get();
         // unlike other fields that appear to the right of the dropdown,
         // the mode fields are intentionally placed on a newline due to the short fixed width of the mode column
-        span.append_child(document.0.create_text_node(label).as_ref())
+        span.append_child(&document.0.create_text_node(label))
             .unwrap();
         let input_field: HtmlInputElement = document.create_element("input");
         input_field.set_type("number");
@@ -624,7 +624,7 @@ fn create_row_output(
 fn setup_single_output_span(span: &Element, output: &ComputerInput) {
     let document = Document::get();
 
-    clear_children(span);
+    span.set_inner_html("");
     let span_html: &HtmlElement = span.dyn_ref().unwrap();
     span_html.style().set_css_text("white-space:nowrap;");
 
@@ -760,7 +760,7 @@ fn setup_subtype_fields_control(span: &Element, control: &DPedalControl) {
 }
 
 fn setup_subtype_fields_numeric(span: &Element, value: Option<i32>) {
-    clear_children(span);
+    span.set_inner_html("");
     if let Some(x) = value {
         let document = Document::get();
         let input_field: HtmlInputElement = document.create_element("input");
