@@ -16,6 +16,7 @@
 mod config;
 mod input;
 mod keyboard;
+mod mapping_state;
 mod mouse;
 mod usb;
 mod web_config;
