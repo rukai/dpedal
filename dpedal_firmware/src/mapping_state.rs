@@ -26,7 +26,7 @@ struct RunningOutputSequence {
 impl MappingState {
     pub fn new() -> Self {
         MappingState {
-            phase: MappingPhase::Released,
+            phase: MappingPhase::Initial,
             output: None,
         }
     }
@@ -52,6 +52,7 @@ impl MappingState {
     async fn process_phase(&mut self, mapping: &Mapping, all_pressed: bool) {
         self.phase = match mapping.mode {
             MappingMode::OnPress => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => {
                     self.start_outputs();
                     MappingPhase::Pressed
@@ -64,6 +65,7 @@ impl MappingState {
             },
 
             MappingMode::OnHold { hold_ms: threshold } => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => MappingPhase::HeldPending {
                     since: Instant::now(),
                 },
@@ -84,6 +86,7 @@ impl MappingState {
             },
 
             MappingMode::Toggle => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => {
                     self.start_outputs();
                     MappingPhase::ToggleOnAwaitingRelease
@@ -98,6 +101,7 @@ impl MappingState {
             },
 
             MappingMode::MacroOnPress => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => {
                     self.start_outputs();
                     MappingPhase::Pressed
@@ -107,6 +111,7 @@ impl MappingState {
             },
 
             MappingMode::MacroOnRelease => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => MappingPhase::Pressed,
                 (MappingPhase::Pressed, false) => {
                     self.start_outputs();
@@ -116,6 +121,7 @@ impl MappingState {
             },
 
             MappingMode::MacroOnTap { tap_ms: threshold } => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => MappingPhase::HeldPending {
                     since: Instant::now(),
                 },
@@ -136,6 +142,7 @@ impl MappingState {
 
             MappingMode::MacroOnDoubleTap { tap_ms: threshold } => {
                 match (self.phase, all_pressed) {
+                    (MappingPhase::Initial, false) => MappingPhase::Released,
                     (MappingPhase::Released, true) => MappingPhase::HeldPending {
                         since: Instant::now(),
                     },
@@ -178,6 +185,7 @@ impl MappingState {
             }
 
             MappingMode::MacroOnHold { hold_ms: threshold } => match (self.phase, all_pressed) {
+                (MappingPhase::Initial, false) => MappingPhase::Released,
                 (MappingPhase::Released, true) => MappingPhase::HeldPending {
                     since: Instant::now(),
                 },
@@ -315,6 +323,15 @@ impl MappingState {
 
 #[derive(Clone, Copy)]
 enum MappingPhase {
+    /// Initial state on construction.
+    /// Waits for any held button to be released before allowing the mapping to activate.
+    /// Never re-entered after leaving.
+    ///
+    /// This initial state is required to avoid the scenario where:
+    ///   profile 0: OnPress - left button -> SetProfile
+    ///   profile 1: OnPress - left button -> A
+    /// results in the profile changing and A being output from a single left button press
+    Initial,
     /// The input is currently considered released.
     Released,
     /// The input is currently considered held since the Instant.
