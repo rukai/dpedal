@@ -6,20 +6,50 @@ DPedal Build Instructions
 
 {% block content %}
 <h1>DPedal Build Instructions</h1>
-<h2>Parts</h2>
+
+<h2>Tools</h2>
+
+<table class="build-instructions-table">
+  <tr>
+    <th>Tool</th>
+    <th>Required</th>
+    <th>Link</th>
+    <th>Notes</th>
+  </tr>
+  <tr>
+    <td>3D printer</td>
+    <td>Optional</td>
+    <td></td>
+    <td>I personally have a Prusa mini, but these days the Bambu Lab P1S is a much better option.</td>
+  </tr>
+  <tr>
+    <td>Soldering iron</td>
+    <td>Required</td>
+    <td></td>
+    <td>I personally have a Hakko FX-888D, but a Pinecil or similar is a better budget option.</td>
+  </tr>
+  <tr>
+    <td>M3 Hex key or screwdriver</td>
+    <td>Required</td>
+    <td><a href="https://www.amazon.com.au/FITTOO-Hex-Key-Set-Ball/dp/B0F938VSXX">Amazon hex-key set</a>
+    </td>
+    <td></td>
+  </tr>
+  <tr>
+    <td>Helping hands</td>
+    <td>Helpful</td>
+    <td><a href="https://omnifixo.com">Omnifixo</a></td>
+    <td>You can definitely complete this project without helping hands, but it'll make soldering easier</td>
+  </tr>
+</table>
+
+<h2>Standard Parts</h2>
 
 <table class="build-instructions-table">
   <tr>
     <th>Part</th>
     <th>Quantity</th>
     <th>Link</th>
-  </tr>
-  <tr>
-    <td>DPedal PCB</td>
-    <td>1</td>
-    <td><a href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_gerber_files.zip">Download</a>, then
-      <a href="#orderpcb">order online</a>
-    </td>
   </tr>
   <tr>
     <td>Raspberry Pi Pico 1 USB C clone (headerless)</td>
@@ -32,14 +62,6 @@ DPedal Build Instructions
     <td>1</td>
     <td><a href="">Amazon</a></td>
   </tr>
-  <tr><!--TODO: split into own section and list each part individually-->
-    <td>3D printed parts</td>
-    <td>1 each</td>
-    <td><a href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_3d_printed_parts.zip">Download</a>
-      and print yourself,<br>or upload to a <a href="https://jlc3dp.com/3d-printing-quote">printing
-        service</a>
-    </td>
-  </tr>
   <tr>
     <td>8mm M3 machine screws</td>
     <td>8</td>
@@ -49,11 +71,6 @@ DPedal Build Instructions
     <td>M3 square nuts</td>
     <td>8</td>
     <td><a href="https://www.aliexpress.com/item/1005001612157787.html">AliExpress</a></td>
-  </tr>
-  <tr>
-    <td>choc v1 28.5mm buttons</td>
-    <td>2</td>
-    <td><a href="https://www.aliexpress.com/item/1005006902597750.html">AliExpress</a></td>
   </tr>
   <tr>
     <td>white choc v1 switches</td>
@@ -67,7 +84,7 @@ DPedal Build Instructions
   </tr>
   <tr>
     <td>Solder</td>
-    <td>enough</td>
+    <td>a bit</td>
     <td><a href="https://www.amazon.com.au/gp/product/B09LDCZGH1">Amazon</a></td>
   </tr>
 </table>
@@ -75,72 +92,137 @@ DPedal Build Instructions
 <p>Note: The official micro USB version of the Pico will also work fine, but I recommend the unofficial USB C clone,
   since USB C is a nicer connector. Just make sure to get one that matches the dimensions of the official Pico,
   including the components on the pico which can be placed differently in some clones.</p>
-<!--
-    * wire lengths (including stripped ends):
-    * button left: 70mm
-    * dpad left: 55mm
-    * dpad top: 70mm
-    * dpad right: 150mm (technically 145mm)
-    * dpad bottom: 150mm
-    * button right: 140mm
-    -->
 
-<img class="build-img" src="/media/all_parts.webp">
+<img class="build-img" src="/media/standard_parts.webp">
 
-<h2>Tools</h2>
+<h2>Printed Parts</h2>
+
+<p>First <a href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_3d_printed_parts.zip">download the
+    STLs here</a>. Then find a way to print them.
+</p>
+
+<p>
+  For the majority of parts, you can choose to print them at home or use a printing service like JLC.
+  However, some parts will need to be printed by a service in high-strength + high-accuracy resin or nylon.
+</p>
+
 
 <table class="build-instructions-table">
   <tr>
-    <th>Tool</th>
-    <th>Link</th>
-    <th>Notes</th>
+    <th>Part</th>
+    <th>Quantity</th>
+    <th>Method</th>
   </tr>
   <tr>
-    <td>3D printer</td>
-    <td></td>
-    <td>I personally have a Prusa mini, but these days the Bambu Lab P1S is a much better option.</td>
+    <td>Footrest</td>
+    <td>1</td>
+    <td>Home FDM or order from JLC</td>
   </tr>
   <tr>
-    <td>Soldering iron</td>
-    <td></td>
-    <td>I personally have a Hakko FX-888D, but a Pinecil or similar is a better budget option.</td>
+    <td>Base With Pico</td>
+    <td>1</td>
+    <td>Home FDM or order from JLC</td>
   </tr>
   <tr>
-    <td>3M Hex key</td>
-    <td><a href="https://www.amazon.com.au/FITTOO-Hex-Key-Set-Ball/dp/B0F938VSXX">Amazon</a>
-    </td>
-    <td></td>
+    <td>Base Without Pico</td>
+    <td>1</td>
+    <td>Home FDM or order from JLC</td>
+  </tr>
+  <tr>
+    <td>Switch Plate</td>
+    <td>1</td>
+    <td>Home FDM or order from JLC</td>
+  </tr>
+  <tr>
+    <td>Soldering Jig</td>
+    <td>1</td>
+    <td>Home FDM or order from JLC</td>
+  </tr>
+  <tr>
+    <td>Button Keycap</td>
+    <td>2</td>
+    <td>Order from JLC (The pins will break if printed using FDM printers)</td>
+  </tr>
+  <tr>
+    <td>Dpad</td>
+    <td>1</td>
+    <td>Order from JLC to ensure it matches the keycaps or otherwise just print at home.</td>
   </tr>
 </table>
-<!--<p>TODO: image of everything laid out</p>-->
 
-<h2 id="orderpcb">Ordering PCB</h2>
+<img class="build-img" src="/media/all_parts.webp">
+
+<p>To order:</p>
+<ol>
+  <li>Download the STLs <a
+      href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_3d_printed_parts.zip">here</a>, and extract
+    them from the zip file.</li>
+  <li>For each part to be ordered</li>
+  <ol>
+    <li>Go to <a href="https://jlc2dp.com/3d-printing-quote">JLC3DP</a></li>
+    <li>Click "Add 3D files" and upload the STL for the part.</li>
+    <li>Set "3D technology" + "Material"</li>
+    <ul>
+      <li>The following are known to be suitable for the button keycaps + dpad</li>
+      <ul>
+        <li>SLA(Resin) -> LEDO6060 Resign (White)</li>
+        <li>SLA(Resin) -> Black Resin</li>
+      </ul>
+      <li>The following are known to be suitable for everything else</li>
+      <ul>
+        <li>SLA(Resin) -> LEDO6060 Resign (White)</li>
+        <li>SLA(Resin) -> Black Resin</li>
+      </ul>
+    </ul>
+    <li>Set "Qty" as per above table</li>
+    <li>Set "Product Desc" to:</li>
+    <ul>
+      <li>"Office Appliance and Accessories" -> "Plastic Keycaps" (for keycaps + dpad)</li>
+      <li>"Office Appliance and Accessories" -> "Plastic Keyboard Enclosure" (for everything else)</li>
+    </ul>
+    <li>Save to cart</li>
+  </ol>
+  <li>Go to next section before completing the order</li>
+</ol>
+
+<h2 id="orderpcb">The PCB</h2>
+
+<p>DPedal uses a custom PCB which must be ordered from a PCB manufacturer.</p>
+
+<img class="build-img" src="/media/pcb.webp">
 
 <ol>
-  <li>Download <a
-      href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_gerber_files.zip">dpedal_gerber_files.zip</a>.
+  <li>Download the <a
+      href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_gerber_files.zip">dpedal_gerber_files.zip</a>,
+    do not extract it.
   </li>
   <li>Go to <a href="https://cart.jlcpcb.com/quote">JLCPCB</a>, click "Add gerber file" and upload the
-    dpedal_gerber_files.zip you just downloaded</li>
+    dpedal_gerber_files.zip</li>
   <li>Set the following options, leaving the rest as default:</li>
   <ul>
     <li>Surface finish: LeadFree HASL</li>
     <li>PCB thickness 1.2mm</li>
     <li>PCB Color: whatever you want</li>
   </ul>
-  <li>Complete order. You probably want "Global Standard Direct Line" for shipping.</li>
+  <li>Save to cart.</li>
+  <li>Check out your order.</li>
+  <ul>
+    <li>You probably want "Global Standard Direct Line" for shipping.</li>
+    <li>Make sure all printed parts in your cart are included in the order.</li>
+  </ul>
 </ol>
 
-<h2>Printing</h2>
+<h2>Printing at home</h2>
 
+<p>
+  Any printed parts that you didnt order from a service will need to be printed at home.
+</p>
 <p>
   Download the STLs <a
     href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_3d_printed_parts.zip">here</a>.
-  Then slice and print each STL yourself, or upload to a <a href="https://jlc3dp.com/3d-printing-quote">printing
-    service</a>.
 </p>
 
-<p>Slicing configuration for each part:</p>
+<p>Then slice and print each part with the following configuration:</p>
 
 <ul>
   <li>default orientation with no supports</li>
@@ -148,6 +230,10 @@ DPedal Build Instructions
   <li>infill: 15% grid infill (I just use grid because its the default, any infill type is probably fine)</li>
   <li>Filament: I use PLA but any hard filament should work fine.</li>
 </ul>
+
+<h2>Time Passes</h2>
+
+<p>Wait patiently (or impatiently) for the various orders to arrive.</p>
 
 <h2>Soldering</h2>
 
@@ -159,9 +245,9 @@ DPedal Build Instructions
 </p>
 <p>For lead-free solder I reccommend setting your iron to 350 degrees.</p>
 <ol>
-  <li>Take the printed jig and Pico.</li>
+  <li>Take the soldering jig and Pico.</li>
   <img class="build-img" loading="lazy" src="/media/pico_jig1.webp">
-  <li>Connect printed jig into the Pico via the through holes and pins</li>
+  <li>Connect soldering jig into the Pico via the through holes and pins</li>
   <img class="build-img" loading="lazy" src="/media/pico_jig2.webp">
   <li>Connect Pico to the PCB via the jig, it may need to be pushed until clicking into place. The Pico should sit
     secure and flatly on the PCB. Make sure the orientation matches the image, the "DPedal V3" text should NOT be
@@ -174,7 +260,8 @@ DPedal Build Instructions
     tip of the soldering iron, while feeding solder into the point where the iron and two pads connect.
   </li>
   <ul>
-    <li>WARNING: The solder should not form large blobs on top of the Pico or you may have trouble fitting the PCB into
+    <li>WARNING: The solder should not form large blobs on top of the Pico or you may have trouble fitting the PCB
+      into
       the case.</li>
     <li>NOTE: Having this many small pads close together may sound tricky with risk of shorting adjacent pads, in
       reality as long as you use only a minimal amount of solder, its not too bad as solder will want to stick to the
@@ -184,7 +271,8 @@ DPedal Build Instructions
   </ul>
   <img class="build-img" loading="lazy" src="/media/pico_jig5.webp">
   <li>Place hotswap sockets into their holes on the PCB and solder the sockets to the PCB: Heat the ends of the
-    socket and the pad on the PCB with the iron, while feeding solder into the point where the iron, PCB pad and socket
+    socket and the pad on the PCB with the iron, while feeding solder into the point where the iron, PCB pad and
+    socket
     end
     meet.</li>
   <img class="build-img" loading="lazy" src="/media/hotswap_solder.webp">
@@ -242,11 +330,13 @@ DPedal Build Instructions
 
   <li>Insert a switch into each socket</li>
   <ul>
-    <li>WARNING: the orientation of the pins is different for each socket, make sure the switch is oriented correctly as
+    <li>WARNING: the orientation of the pins is different for each socket, make sure the switch is oriented correctly
+      as
       you insert it.</li>
   </ul>
   <img class="build-img" loading="lazy" src="/media/flashing4.webp">
-  <li>Open <a href="scroll_test.html">this page</a> and test each button works, the default button mapping of the DPedal
+  <li>Open <a href="scroll_test.html">this page</a> and test each button works, the default button mapping of the
+    DPedal
     has mouse scroll on the dpad and page up/down on the left/right buttons.</li>
   <ul>
     <li>
@@ -271,7 +361,8 @@ DPedal Build Instructions
   <img class="build-img" loading="lazy" src="/media/switchplate_and_base4.webp">
   <li>Push all 6 switches into their sockets until they click into place.</li>
   <ul>
-    <li>WARNING: the orientation of the pins is different for each socket, make sure the switch is oriented correctly as
+    <li>WARNING: the orientation of the pins is different for each socket, make sure the switch is oriented correctly
+      as
       you insert it. </li>
   </ul>
   <img class="build-img" loading="lazy" src="/media/insert_switches.webp">
