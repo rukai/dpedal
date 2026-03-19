@@ -317,4 +317,23 @@ DPedal Build Instructions
   <!-- add some extra padding at the bottom, so the text doesn't abruptly hit the bottom of the page-->
 </div>
 
+<!--
+    Force 1:1 image pixel to rendered pixel.
+    By default browsers will scale up images when in hidpi mode to ensure layout is maintained.
+    However, this page doesnt really need a layout maintained and this upscaling just turns most of the images into a blurry mess.
+    So this script disables that by descaling image sizes via the dpi
+  -->
+<script>
+  function fixImageScale(img) {
+    img.style.width = (img.naturalWidth / window.devicePixelRatio) + 'px';
+  }
+  document.querySelectorAll('img').forEach(function (img) {
+    if (img.complete) {
+      fixImageScale(img);
+    } else {
+      img.addEventListener('load', function () { fixImageScale(img); });
+    }
+  });
+</script>
+
 {% endblock %}
