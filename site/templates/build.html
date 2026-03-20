@@ -85,7 +85,7 @@ DPedal Build Instructions
     * button right: 140mm
     -->
 
-<img src="/media/all_parts.webp">
+<img class="build-img" src="/media/all_parts.webp">
 
 <h2>Tools</h2>
 
@@ -160,16 +160,16 @@ DPedal Build Instructions
 <p>For lead-free solder I reccommend setting your iron to 350 degrees.</p>
 <ol>
   <li>Take the printed jig and Pico.</li>
-  <img loading="lazy" src="/media/pico_jig1.webp">
+  <img class="build-img" loading="lazy" src="/media/pico_jig1.webp">
   <li>Connect printed jig into the Pico via the through holes and pins</li>
-  <img loading="lazy" src="/media/pico_jig2.webp">
+  <img class="build-img" loading="lazy" src="/media/pico_jig2.webp">
   <li>Connect Pico to the PCB via the jig, it may need to be pushed until clicking into place. The Pico should sit
     secure and flatly on the PCB. Make sure the orientation matches the image, the "DPedal V3" text should NOT be
     visible on the PCB.</li>
   <ul>
     <li>NOTE: If the Pico is not sitting flat against the PCB, some masking tape can be used to secure it.</li>
   </ul>
-  <img loading="lazy" src="/media/pico_jig4.webp">
+  <img class="build-img" loading="lazy" src="/media/pico_jig4.webp">
   <li>Solder Pico to the PCB. For every pad on the PCB, heat both the pad on the Pico and the pad on the PCB with the
     tip of the soldering iron, while feeding solder into the point where the iron and two pads connect.
   </li>
@@ -182,23 +182,23 @@ DPedal Build Instructions
       surfaces and avoid the green PCB surface. However if you do manage to join some adjacent pads, you might find <a
         href="https://www.youtube.com/watch?v=IjOh5ShVX_w">solder wick</a> helpful.</li>
   </ul>
-  <img loading="lazy" src="/media/pico_jig5.webp">
+  <img class="build-img" loading="lazy" src="/media/pico_jig5.webp">
   <li>Place hotswap sockets into their holes on the PCB and solder the sockets to the PCB: Heat the ends of the
     socket and the pad on the PCB with the iron, while feeding solder into the point where the iron, PCB pad and socket
     end
     meet.</li>
-  <img loading="lazy" src="/media/hotswap_solder.webp">
+  <img class="build-img" loading="lazy" src="/media/hotswap_solder.webp">
 </ol>
 
 <h2>Flashing firmware</h2>
 
 <ol>
   <li>Start holding down the bootsel button. Do not let go.</li>
-  <img loading="lazy" src="/media/flashing1.webp">
+  <img class="build-img" loading="lazy" src="/media/flashing1.webp">
   <li>Connect the Pico/PCB to your computer via USB.</li>
-  <img loading="lazy" src="/media/flashing2.webp">
+  <img class="build-img" loading="lazy" src="/media/flashing2.webp">
   <li>Let go of the bootsel button.</li>
-  <img loading="lazy" src="/media/flashing3.webp">
+  <img class="build-img" loading="lazy" src="/media/flashing3.webp">
   <li>Follow the steps below depending on your OS:</li>
   <ul>
 
@@ -219,7 +219,7 @@ DPedal Build Instructions
       <li>The Pico should present itself as an extra drive. Click and drag the downloaded dpedal_firmware.uf2 onto the
         Pico's drive
       </li>
-      <img loading="lazy" src="/media/uf2_windows2.webp">
+      <img class="build-img" loading="lazy" src="/media/uf2_windows2.webp">
     </ol>
     <li>Linux</li>
     <ol>
@@ -236,7 +236,7 @@ DPedal Build Instructions
       <li>open a terminal to the directory containing the firmware and run
         <span style="color:red;font-family:mono;">./dpedalflash</span>
       </li>
-      <img loading="lazy" src="/media/linux_flash.webp">
+      <img class="build-img" loading="lazy" src="/media/linux_flash.webp">
     </ol>
   </ul>
 
@@ -245,7 +245,7 @@ DPedal Build Instructions
     <li>WARNING: the orientation of the pins is different for each socket, make sure the switch is oriented correctly as
       you insert it.</li>
   </ul>
-  <img loading="lazy" src="/media/flashing4.webp">
+  <img class="build-img" loading="lazy" src="/media/flashing4.webp">
   <li>Open <a href="scroll_test.html">this page</a> and test each button works, the default button mapping of the DPedal
     has mouse scroll on the dpad and page up/down on the left/right buttons.</li>
   <ul>
@@ -255,32 +255,32 @@ DPedal Build Instructions
     </li>
   </ul>
   <li>Unplug from the computer and disconnect the switches again, to prepare for the next stage.</li>
-  <img loading="lazy" src="/media/flashing5.webp">
+  <img class="build-img" loading="lazy" src="/media/flashing5.webp">
 </ol>
 
 <h2>Assembling</h2>
 
 <ol>
   <li>Place PCB into the base part with the hole for the USB port.</li>
-  <img loading="lazy" src="/media/switchplate_and_base1.webp">
+  <img class="build-img" loading="lazy" src="/media/switchplate_and_base1.webp">
   <li>Place switch plate on top of the PCB</li>
-  <img loading="lazy" src="/media/switchplate_and_base2.webp">
+  <img class="build-img" loading="lazy" src="/media/switchplate_and_base2.webp">
   <li>Place 4 screws through the switch plate and base.</li>
-  <img loading="lazy" src="/media/switchplate_and_base3.webp">
+  <img class="build-img" loading="lazy" src="/media/switchplate_and_base3.webp">
   <li>For each screw, hold a square nut behind it and screw them together.</li>
-  <img loading="lazy" src="/media/switchplate_and_base4.webp">
+  <img class="build-img" loading="lazy" src="/media/switchplate_and_base4.webp">
   <li>Push all 6 switches into their sockets until they click into place.</li>
   <ul>
     <li>WARNING: the orientation of the pins is different for each socket, make sure the switch is oriented correctly as
       you insert it. </li>
   </ul>
-  <img loading="lazy" src="/media/insert_switches.webp">
+  <img class="build-img" loading="lazy" src="/media/insert_switches.webp">
   <li>Put the dpad between the two base pieces and push the pieces together.</li>
-  <img loading="lazy" src="/media/connect_other_base.webp">
+  <img class="build-img" loading="lazy" src="/media/connect_other_base.webp">
   <li>Screw the remaining base part to the switch plate, using 4 screws and 4 nuts.</li>
-  <img loading="lazy" src="/media/screw_other_base.webp">
+  <img class="build-img" loading="lazy" src="/media/screw_other_base.webp">
   <li>Push the 2 buttons into the 2 empty switches</li>
-  <img loading="lazy" src="/media/insert_buttons.webp">
+  <img class="build-img" loading="lazy" src="/media/insert_buttons.webp">
 </ol>
 <!--
     1. cut wires and strip ends, strip about ~2-3mm
@@ -301,10 +301,10 @@ DPedal Build Instructions
 <h2>Finished!</h2>
 
 <p>Your DPedal is now fully assembled and ready to use.</p>
-<img src="/media/finished.webp" loading="lazy">
+<img class="build-img" src="/media/finished.webp" loading="lazy">
 
 <p>Slot in the footrest when using it.</p>
-<img src="/media/attach_footrest.webp" loading="lazy">
+<img class="build-img" src="/media/attach_footrest.webp" loading="lazy">
 
 <p>If you want to change the keyboard/mouse mapping you can use the <a href="/config.html">web configurator</a>.</p>
 
