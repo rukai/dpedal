@@ -1,7 +1,5 @@
 use defmt::error;
-use dpedal_config::{
-    CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, CONFIG_SINGLE_SIZE, Config, PICO_FLASH_SIZE,
-};
+use dpedal_config::{CONFIG_FLASH_RANGE, CONFIG_SINGLE_SIZE, Config, PICO_FLASH_SIZE};
 use embassy_rp::{
     Peri,
     dma::Channel,
@@ -20,8 +18,6 @@ pub static CONFIG: Mutex<CriticalSectionRawMutex, Option<Config>> = Mutex::new(N
 pub static CONFIG_UPDATED: Watch<CriticalSectionRawMutex, (), 2> = Watch::new();
 
 const CONFIG_KEY: u8 = 0;
-const CONFIG_FLASH_RANGE: core::ops::Range<u32> =
-    CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_AVAILABLE_SIZE as u32);
 
 pub struct ConfigFlash {
     storage: MapStorage<u8, Flash<'static, FLASH, Async, PICO_FLASH_SIZE>, NoCache>,
@@ -64,10 +60,8 @@ impl ConfigFlash {
     pub async fn load_config_bytes_from_flash(
         &mut self,
     ) -> Result<Vec<u8, CONFIG_SINGLE_SIZE>, ()> {
-        let storage = &mut self.storage;
-        let data_buffer = &mut *self.data_buffer;
-        let result: Option<&[u8]> = storage
-            .fetch_item::<&[u8]>(data_buffer, &CONFIG_KEY)
+        let result = self.storage
+            .fetch_item::<&[u8]>(self.data_buffer, &CONFIG_KEY)
             .await
             .map_err(|_| ())?;
         match result {
@@ -94,15 +88,10 @@ impl ConfigFlash {
         }
         self.check_valid_config(bytes)?;
 
-        {
-            let storage = &mut self.storage;
-            let data_buffer = &mut *self.data_buffer;
-            let slice: &[u8] = bytes.as_slice();
-            storage
-                .store_item::<&[u8]>(data_buffer, &CONFIG_KEY, &slice)
-                .await
-                .map_err(|_| ())?;
-        }
+        self.storage
+            .store_item::<&[u8]>(self.data_buffer, &CONFIG_KEY, &bytes.as_slice())
+            .await
+            .map_err(|_| ())?;
 
         self.load().await;
         Ok(())

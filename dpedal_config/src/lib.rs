@@ -11,6 +11,8 @@ pub const FIRMWARE_SIZE: usize = 1024 * 1024; // 1 MiB
 pub const CONFIG_OFFSET: usize = 1024 * 1024; // 1 MiB
 /// How much space in flash is available for storing config (handed to MapStorage for wear leveling)
 pub const CONFIG_AVAILABLE_SIZE: usize = 1024 * 1024; // 1 MiB
+pub const CONFIG_FLASH_RANGE: core::ops::Range<u32> =
+    CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_AVAILABLE_SIZE as u32);
 /// How much space a single serialized Config object takes up in flash
 pub const CONFIG_SINGLE_SIZE: usize = 1024 * 12; // 12 KiB
 
