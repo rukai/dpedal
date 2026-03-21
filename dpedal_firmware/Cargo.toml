@@ -15,12 +15,12 @@ defmt = "1"
 defmt-rtt = "1"
 
 
-embassy-futures = { git = "https://github.com/embassy-rs/embassy"}
-embassy-rp = { git = "https://github.com/embassy-rs/embassy", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
-embassy-executor = { git = "https://github.com/embassy-rs/embassy", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
-embassy-usb = { git = "https://github.com/embassy-rs/embassy", features = ["defmt"] }
-embassy-time = { git = "https://github.com/embassy-rs/embassy"}
-embassy-sync = { git = "https://github.com/embassy-rs/embassy"}
+embassy-futures = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed5ae17b96ac006c0f460e222502e411d" }
+embassy-rp = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed5ae17b96ac006c0f460e222502e411d", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed5ae17b96ac006c0f460e222502e411d", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-usb = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed5ae17b96ac006c0f460e222502e411d", features = ["defmt"] }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed5ae17b96ac006c0f460e222502e411d" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed5ae17b96ac006c0f460e222502e411d" }
 
 # embassy-futures = "0.1.2"
 # embassy-rp = { version = "0.8.0", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
@@ -31,10 +31,9 @@ embassy-sync = { git = "https://github.com/embassy-rs/embassy"}
 usbd-hid = "0.9.0"
 portable-atomic = { version = "1.11.0", features = ["critical-section"] }
 static_cell = "2.1.1"
-rkyv = { version = "0.8.10", default-features = false, features = ["arrayvec-0_7", "bytecheck"], git = "https://github.com/rukai/rkyv", branch = "add_support_for_arraystring" }
 dpedal_config = { path = "../dpedal_config"}
 postcard = "1.1.3"
-arrayvec = { version = "0.7.6", default-features = false, features = ["serde"] }
+heapless = { version = "0.8", default-features = false, features = ["serde"] }
 
 [profile.release]
 codegen-units = 1

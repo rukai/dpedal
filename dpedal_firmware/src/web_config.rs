@@ -114,16 +114,14 @@ impl WebConfig {
                 }
             };
             let response = match request {
-                Request::GetConfig => Response::GetConfig(
-                    self.config_flash
-                        .load_config_bytes_from_flash()
-                        .map(|x| x.0),
-                ),
-                Request::SetConfig(array_vec) => {
-                    defmt::info!("set config {:?}", array_vec.as_ref());
+                Request::GetConfig => {
+                    Response::GetConfig(self.config_flash.load_config_bytes_from_flash())
+                }
+                Request::SetConfig(config_bytes) => {
+                    defmt::info!("set config {:?}", config_bytes.as_slice());
                     if let Err(()) = self
                         .config_flash
-                        .store_config_bytes_to_flash_and_reload_config(&array_vec)
+                        .store_config_bytes_to_flash_and_reload_config(&config_bytes)
                         .await
                     {
                         // TODO: return error over protocol

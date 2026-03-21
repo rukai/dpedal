@@ -5,8 +5,7 @@ edition = "2024"
 repository = "https://github.com/rukai/dpedal"
 
 [dependencies]
-rkyv.workspace = true
-arrayvec = { version = "0.7.6", default-features = false, features = ["serde"] }
+heapless.workspace = true
 usbd-hid = { version = "0.9.0", default-features = false }
 serde = { version = "1.0.0", default-features = false, features = ["derive"] }
 defmt = "1"

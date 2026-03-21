@@ -12,7 +12,7 @@ resolver = "2"
 
 
 [workspace.dependencies]
-rkyv = { version = "0.8.10", default-features = false, features = ["arrayvec-0_7", "bytecheck"], git = "https://github.com/rukai/rkyv", branch = "add_support_for_arraystring" }
+heapless = { version = "0.8", default-features = false, features = ["serde"] }
 
 # The profile that 'cargo dist' will build with
 [profile.dist]

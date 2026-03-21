@@ -14,10 +14,10 @@ goblin = "0.9.3"
 miette = { version = "7.4.0", features = ["fancy"] }
 dpedal_config = { path = "../dpedal_config" }
 kdl = "6.3.3"
-kdl_config = { git = "https://github.com/rukai/kdl_config" }
+kdl_config = { git = "https://github.com/rukai/kdl_config", features = ["heapless_08"] }
 kdl_config_derive = { git = "https://github.com/rukai/kdl_config" }
-arrayvec = "0.7.6"
-rkyv = { workspace = true, features = ["alloc"] }
+heapless = { workspace = true }
+postcard = { version = "1.1.3", features = ["use-std"] }
 
 # workaround https://gitlab.com/robigalia/ssmarshal/-/merge_requests/2
 # TODO: lets just eradicate this unmaintained thing from the dep tree entirely

@@ -1,5 +1,4 @@
-use arrayvec::ArrayString;
-use arrayvec::ArrayVec;
+use dpedal_config::CONFIG_SIZE;
 use dpedal_config::ComputerInput;
 use dpedal_config::Config;
 use dpedal_config::DPedalControl;
@@ -21,7 +20,6 @@ use dpedal_config::web_config_protocol::Request;
 use dpedal_config::web_config_protocol::Response;
 use element_iterator::ElementChildIter;
 use log::Level;
-use rkyv::rancor::Error;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -197,14 +195,14 @@ async fn write_config(
     preserved: PreservedConfig,
 ) -> Result<(), String> {
     let profiles_container: Element = document.get_element("profiles-container");
-    let mut profiles = ArrayVec::new();
+    let mut profiles = heapless::Vec::new();
 
     for profile_section in ElementChildIter::new(&profiles_container) {
         let mut section_children = ElementChildIter::new(&profile_section);
         section_children.next(); // skip header_row
         let table = section_children.next().unwrap();
 
-        let mut mappings = ArrayVec::new();
+        let mut mappings = heapless::Vec::new();
 
         // Iterate over rows, skipping the header
         for row in ElementChildIter::new(&table).skip(1) {
@@ -215,26 +213,28 @@ async fn write_config(
             let input_cell: Element = cells.next().unwrap();
             let wrapper = input_cell.children().item(0).unwrap();
             let selects_container = wrapper.children().item(2).unwrap();
-            let input = ArrayVec::from_iter(ElementChildIter::new(&selects_container).map(
-                |wrapper: Element| {
+            let input = ElementChildIter::new(&selects_container)
+                .map(|wrapper: Element| {
                     let s: HtmlSelectElement =
                         wrapper.first_element_child().unwrap().dyn_into().unwrap();
                     DpedalInput::from_string(&s.value()).unwrap()
-                },
-            ));
+                })
+                .collect();
             let output_sequence = parse_output_cell(&cells.next().unwrap());
-            mappings.push(Mapping {
-                input_set: input,
-                mode,
-                output_sequence,
-            });
+            mappings
+                .push(Mapping {
+                    input_set: input,
+                    mode,
+                    output_sequence,
+                })
+                .unwrap();
         }
 
-        profiles.push(Profile { mappings });
+        profiles.push(Profile { mappings }).unwrap();
     }
 
     let name: HtmlInputElement = document.get_element("device_name");
-    let nickname = ArrayString::from(&name.value()).map_err(|_| {
+    let nickname = heapless::String::try_from(name.value().as_str()).map_err(|_| {
         format!(
             "nickname must be <= {MAX_NICKNAME_LEN} characters long, but was {} characters long",
             name.value().len()
@@ -253,8 +253,9 @@ async fn write_config(
         pin_remappings: preserved.pin_remappings,
     };
 
-    let config_bytes =
-        ArrayVec::from_iter(rkyv::to_bytes::<Error>(&config).unwrap().iter().cloned());
+    let config_bytes_std = postcard::to_stdvec(&config).unwrap();
+    let config_bytes: heapless::Vec<u8, CONFIG_SIZE> =
+        heapless::Vec::from_slice(&config_bytes_std).unwrap();
     device
         .send_request(&Request::SetConfig(config_bytes))
         .await?;
@@ -279,7 +280,7 @@ fn parse_mode_cell(mode_cell: &Element) -> MappingMode {
     MappingMode::from_string(&variant_name, &ms_value).unwrap_or_default()
 }
 
-fn parse_output_cell(output_cell: &Element) -> ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS> {
+fn parse_output_cell(output_cell: &Element) -> heapless::Vec<ComputerInput, MAX_COMPUTER_INPUTS> {
     let wrapper = output_cell.children().item(0).unwrap();
     let container = wrapper.children().item(2).unwrap();
     ElementChildIter::new(&container)
@@ -327,11 +328,8 @@ async fn request_get_config(device: &Device) -> Result<Config, String> {
     let response = device.send_request(&Request::GetConfig).await?;
     match response {
         Response::GetConfig(config_bytes) => {
-            // TODO: Is Align required in some circumstances?
-            rkyv::from_bytes::<Config, rkyv::rancor::Error>(
-                &config_bytes.map_err(|e| format!("{e:?}"))?,
-            )
-            .map_err(|e| format!("{e:?}"))
+            postcard::from_bytes::<Config>(&config_bytes.map_err(|e| format!("{e:?}"))?)
+                .map_err(|e| format!("{e:?}"))
         }
         Response::SetConfig => panic!("Unexpected dpedal response"),
         Response::ProtocolError => panic!("dpedal protocol error"),
@@ -559,7 +557,7 @@ fn create_dpedal_input_select(document: &Document, value: &DpedalInput) -> HtmlS
 
 fn create_row_input(
     document: &Document,
-    inputs: &ArrayVec<DpedalInput, MAX_DPEDAL_INPUTS>,
+    inputs: &heapless::Vec<DpedalInput, MAX_DPEDAL_INPUTS>,
 ) -> Element {
     let td: Element = document.create_element("td");
 
@@ -597,7 +595,7 @@ fn create_row_input(
 
 fn create_row_output(
     document: &Document,
-    outputs: &ArrayVec<ComputerInput, MAX_COMPUTER_INPUTS>,
+    outputs: &heapless::Vec<ComputerInput, MAX_COMPUTER_INPUTS>,
 ) -> Element {
     let td: Element = document.create_element("td");
 
@@ -803,7 +801,7 @@ fn renumber_profiles(document: &Document) {
 struct PreservedConfig {
     version: u32,
     device: DPedalDevice,
-    pin_remappings: ArrayVec<PinRemapping, MAX_PIN_REMAPPINGS>,
+    pin_remappings: heapless::Vec<PinRemapping, MAX_PIN_REMAPPINGS>,
 }
 
 fn inject_css(document: &Document) {

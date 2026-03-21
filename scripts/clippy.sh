@@ -6,8 +6,9 @@ set -e
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings
 cd dpedal_config_web_app
 cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings
 cd ../dpedal_firmware
 cargo hack --feature-powerset clippy --locked -- -D warnings
+cd ..
+cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings

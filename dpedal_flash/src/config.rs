@@ -1,4 +1,3 @@
-use arrayvec::{ArrayString, ArrayVec};
 use dpedal_config::{
     ComputerInput, Config, DpedalInput, KeyboardInput, MAX_COMPUTER_INPUTS, MAX_DPEDAL_INPUTS,
     MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MappingMode, MouseInput,
@@ -10,12 +9,11 @@ use kdl_config::{
 };
 use kdl_config_derive::{KdlConfig, KdlConfigFinalize};
 use miette::{IntoDiagnostic, NamedSource, miette};
-use rkyv::rancor::Error;
 use std::{path::PathBuf, str::FromStr};
 
 pub fn encode_config(config: &Config) -> miette::Result<Vec<u8>> {
-    let bytes = rkyv::to_bytes::<Error>(config).map_err(|e| miette!(e))?;
-    let mut result = vec![];
+    let bytes = postcard::to_stdvec(config).map_err(|e| miette!(e))?;
+    let mut result = Vec::new();
     result.extend((bytes.len() as u32).to_be_bytes());
     result.extend(bytes.iter());
     Ok(result)
@@ -62,12 +60,12 @@ fn load_source(path: Option<PathBuf>) -> miette::Result<NamedSource<String>> {
 #[kdl_config_finalize_into = "dpedal_config::Config"]
 pub struct ConfigKdl {
     pub version: Parsed<u32>,
-    pub nickname: Parsed<ArrayString<MAX_NICKNAME_LEN>>,
+    pub nickname: Parsed<heapless::String<MAX_NICKNAME_LEN>>,
     pub device: Parsed<DeviceKdl>,
     pub color: Parsed<u32>,
-    pub profiles: Parsed<ArrayVec<Parsed<ProfileKdl>, MAX_PROFILES>>,
+    pub profiles: Parsed<heapless::Vec<Parsed<ProfileKdl>, MAX_PROFILES>>,
     // TODO: add validation: no duplicate pins (including default values), valid pin range
-    pub pin_remappings: Parsed<ArrayVec<Parsed<PinRemappingKdl>, MAX_PIN_REMAPPINGS>>,
+    pub pin_remappings: Parsed<heapless::Vec<Parsed<PinRemappingKdl>, MAX_PIN_REMAPPINGS>>,
 }
 
 #[derive(KdlConfig, KdlConfigFinalize, Default, Debug)]
@@ -81,14 +79,14 @@ pub struct PinRemappingKdl {
 #[derive(KdlConfig, KdlConfigFinalize, Default, Debug)]
 #[kdl_config_finalize_into = "dpedal_config::Profile"]
 pub struct ProfileKdl {
-    pub mappings: Parsed<ArrayVec<Parsed<MappingKdl>, MAX_MAPPINGS>>,
+    pub mappings: Parsed<heapless::Vec<Parsed<MappingKdl>, MAX_MAPPINGS>>,
 }
 
 #[derive(Default, Debug)]
 pub struct MappingKdl {
-    pub input_set: ArrayVec<dpedal_config::DpedalInput, MAX_DPEDAL_INPUTS>,
+    pub input_set: heapless::Vec<dpedal_config::DpedalInput, MAX_DPEDAL_INPUTS>,
     pub mode: MappingMode,
-    pub output_sequence: ArrayVec<dpedal_config::ComputerInput, MAX_COMPUTER_INPUTS>,
+    pub output_sequence: heapless::Vec<dpedal_config::ComputerInput, MAX_COMPUTER_INPUTS>,
 }
 
 impl KdlConfigFinalize for MappingKdl {
@@ -168,7 +166,7 @@ impl KdlConfig for MappingKdl {
                         valid: false,
                     };
                 };
-                let input = ArrayVec::from_iter([input]);
+                let input = heapless::Vec::from_slice(&[input]).unwrap();
 
                 let Some((ty, sub_ty)) = output.split_once("-") else {
                     diagnostics.push(ParseDiagnostic {
@@ -243,7 +241,7 @@ impl KdlConfig for MappingKdl {
                         };
                     }
                 };
-                let output_sequence = ArrayVec::from_iter([output]);
+                let output_sequence = heapless::Vec::from_slice(&[output]).unwrap();
                 Parsed {
                     value: MappingKdl {
                         input_set: input,

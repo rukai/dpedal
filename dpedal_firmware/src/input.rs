@@ -1,14 +1,14 @@
 use crate::config::{CONFIG, CONFIG_UPDATED};
 use crate::mapping_state::MappingState;
-use arrayvec::ArrayVec;
 use core::ops::ControlFlow;
 use dpedal_config::{DpedalInput, MAX_MAPPINGS, MAX_PROFILES, Profile};
 use embassy_rp::gpio::{AnyPin, Input, Pin, Pull};
 use embassy_rp::{Peri, PeripheralType};
 use embassy_time::Timer;
+use heapless::Vec;
 use static_cell::StaticCell;
 
-static PROFILES: StaticCell<ArrayVec<Profile, MAX_PROFILES>> = StaticCell::new();
+static PROFILES: StaticCell<Vec<Profile, MAX_PROFILES>> = StaticCell::new();
 
 pub struct Inputs {
     pins: [Option<Peri<'static, AnyPin>>; 30],
@@ -77,7 +77,9 @@ impl Inputs {
 
                 // Restore mapping state to full length in case it was cleared earlier
                 while profile.mappings.len() > state.mapping_states.len() {
-                    state.mapping_states.push(MappingState::new());
+                    if state.mapping_states.push(MappingState::new()).is_err() {
+                        defmt::panic!("mapping state overflow");
+                    }
                 }
 
                 for (i, mapping) in profile.mappings.iter().enumerate() {
@@ -102,14 +104,14 @@ pub(crate) struct State {
     /// The index of the currently selected profile
     pub(crate) current_profile: u8,
     /// Tracks press/release state for each mapping in the current profile
-    pub(crate) mapping_states: ArrayVec<MappingState, MAX_MAPPINGS>,
+    pub(crate) mapping_states: Vec<MappingState, MAX_MAPPINGS>,
 }
 
 impl State {
     fn new() -> Self {
         State {
             current_profile: 0,
-            mapping_states: ArrayVec::new(),
+            mapping_states: Vec::new(),
         }
     }
 }
