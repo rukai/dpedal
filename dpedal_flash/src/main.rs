@@ -1,5 +1,5 @@
 use clap::Parser;
-use dpedal_config::CONFIG_SIZE;
+use dpedal_config::CONFIG_AVAILABLE_SIZE;
 use miette::Result;
 
 pub mod cli;
@@ -16,7 +16,7 @@ fn main() -> Result<()> {
 
     let cli = cli::Args::parse();
     let config_bytes = if cli.erase_config {
-        vec![0; CONFIG_SIZE]
+        vec![0; CONFIG_AVAILABLE_SIZE]
     } else {
         let config = config::load(cli.path)?;
         config::encode_config(&config)?

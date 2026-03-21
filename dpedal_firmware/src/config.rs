@@ -1,5 +1,7 @@
 use defmt::error;
-use dpedal_config::{CONFIG_OFFSET, CONFIG_SIZE, Config, PICO_FLASH_SIZE};
+use dpedal_config::{
+    CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, CONFIG_SINGLE_SIZE, Config, PICO_FLASH_SIZE,
+};
 use embassy_rp::{
     Peri,
     dma::Channel,
@@ -19,17 +21,17 @@ pub static CONFIG_UPDATED: Watch<CriticalSectionRawMutex, (), 2> = Watch::new();
 
 const CONFIG_KEY: u8 = 0;
 const CONFIG_FLASH_RANGE: core::ops::Range<u32> =
-    CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_SIZE as u32);
+    CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_AVAILABLE_SIZE as u32);
 
 pub struct ConfigFlash {
     storage: MapStorage<u8, Flash<'static, FLASH, Async, PICO_FLASH_SIZE>, NoCache>,
-    data_buffer: &'static mut [u8; CONFIG_SIZE + 8],
+    data_buffer: &'static mut [u8; CONFIG_SINGLE_SIZE + 8],
 }
 
 impl ConfigFlash {
     pub async fn new(p_flash: Peri<'static, FLASH>, dma: Peri<'static, impl Channel>) -> Self {
-        static DATA_BUFFER: StaticCell<[u8; CONFIG_SIZE + 8]> = StaticCell::new();
-        let data_buffer = DATA_BUFFER.init([0u8; CONFIG_SIZE + 8]);
+        static DATA_BUFFER: StaticCell<[u8; CONFIG_SINGLE_SIZE + 8]> = StaticCell::new();
+        let data_buffer = DATA_BUFFER.init([0u8; CONFIG_SINGLE_SIZE + 8]);
 
         let flash = Flash::new(p_flash, dma);
         let mut config_flash = ConfigFlash {
@@ -59,7 +61,9 @@ impl ConfigFlash {
         Ok(())
     }
 
-    pub async fn load_config_bytes_from_flash(&mut self) -> Result<Vec<u8, CONFIG_SIZE>, ()> {
+    pub async fn load_config_bytes_from_flash(
+        &mut self,
+    ) -> Result<Vec<u8, CONFIG_SINGLE_SIZE>, ()> {
         let storage = &mut self.storage;
         let data_buffer = &mut *self.data_buffer;
         let result: Option<&[u8]> = storage
@@ -82,9 +86,9 @@ impl ConfigFlash {
 
     pub async fn store_config_bytes_to_flash_and_reload_config(
         &mut self,
-        bytes: &Vec<u8, CONFIG_SIZE>,
+        bytes: &Vec<u8, CONFIG_SINGLE_SIZE>,
     ) -> Result<(), ()> {
-        if bytes.len() > CONFIG_SIZE {
+        if bytes.len() > CONFIG_SINGLE_SIZE {
             error!("config bytes too long {}", bytes.len());
             return Err(());
         }

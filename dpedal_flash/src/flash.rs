@@ -1,4 +1,4 @@
-use dpedal_config::{CONFIG_OFFSET, CONFIG_SIZE, FIRMWARE_OFFSET, FIRMWARE_SIZE};
+use dpedal_config::{CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, FIRMWARE_OFFSET, FIRMWARE_SIZE};
 use miette::{Result, miette};
 use picoboot_rs::{
     PICO_FLASH_START, PICO_PAGE_SIZE, PICO_SECTOR_SIZE, PICO_STACK_POINTER, PicobootConnection,
@@ -14,11 +14,11 @@ pub fn flash_device(firmware: &[u8], config: &[u8]) -> Result<()> {
             FIRMWARE_SIZE
         ));
     }
-    if config.len() > CONFIG_SIZE {
+    if config.len() > CONFIG_AVAILABLE_SIZE {
         return Err(miette!(
             "Config is too large to flash, is {:?} bytes but must be less than or equal to {:?} bytes.",
             config.len(),
-            CONFIG_SIZE
+            CONFIG_AVAILABLE_SIZE
         ));
     }
 

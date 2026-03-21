@@ -1,4 +1,4 @@
-use dpedal_config::CONFIG_SIZE;
+use dpedal_config::CONFIG_SINGLE_SIZE;
 use dpedal_config::ComputerInput;
 use dpedal_config::Config;
 use dpedal_config::DPedalControl;
@@ -254,7 +254,7 @@ async fn write_config(
     };
 
     let config_bytes_std = postcard::to_stdvec(&config).unwrap();
-    let config_bytes: heapless::Vec<u8, CONFIG_SIZE> =
+    let config_bytes: heapless::Vec<u8, CONFIG_SINGLE_SIZE> =
         heapless::Vec::from_slice(&config_bytes_std).unwrap();
     device
         .send_request(&Request::SetConfig(config_bytes))
