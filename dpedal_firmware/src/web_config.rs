@@ -115,7 +115,7 @@ impl WebConfig {
             };
             let response = match request {
                 Request::GetConfig => {
-                    Response::GetConfig(self.config_flash.load_config_bytes_from_flash())
+                    Response::GetConfig(self.config_flash.load_config_bytes_from_flash().await)
                 }
                 Request::SetConfig(config_bytes) => {
                     defmt::info!("set config {:?}", config_bytes.as_slice());

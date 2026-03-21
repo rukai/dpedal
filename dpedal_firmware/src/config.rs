@@ -2,26 +2,46 @@ use defmt::error;
 use dpedal_config::{CONFIG_OFFSET, CONFIG_SIZE, Config, PICO_FLASH_SIZE};
 use embassy_rp::{
     Peri,
-    flash::{Blocking, Flash},
+    dma::Channel,
+    flash::{Async, Flash},
     peripherals::FLASH,
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, watch::Watch};
 use heapless::Vec;
+use sequential_storage::{
+    cache::NoCache,
+    map::{MapConfig, MapStorage},
+};
+use static_cell::StaticCell;
 
 pub static CONFIG: Mutex<CriticalSectionRawMutex, Option<Config>> = Mutex::new(None);
 pub static CONFIG_UPDATED: Watch<CriticalSectionRawMutex, (), 2> = Watch::new();
 
+const CONFIG_KEY: u8 = 0;
+const CONFIG_FLASH_RANGE: core::ops::Range<u32> =
+    CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_SIZE as u32);
+
 pub struct ConfigFlash {
-    flash: Flash<'static, FLASH, Blocking, PICO_FLASH_SIZE>,
+    storage: MapStorage<u8, Flash<'static, FLASH, Async, PICO_FLASH_SIZE>, NoCache>,
+    data_buffer: &'static mut [u8; CONFIG_SIZE + 8],
 }
 
 impl ConfigFlash {
-    pub async fn new(p_flash: Peri<'static, FLASH>) -> Self {
-        let mut flash = ConfigFlash {
-            flash: Flash::new_blocking(p_flash),
+    pub async fn new(p_flash: Peri<'static, FLASH>, dma: Peri<'static, impl Channel>) -> Self {
+        static DATA_BUFFER: StaticCell<[u8; CONFIG_SIZE + 8]> = StaticCell::new();
+        let data_buffer = DATA_BUFFER.init([0u8; CONFIG_SIZE + 8]);
+
+        let flash = Flash::new(p_flash, dma);
+        let mut config_flash = ConfigFlash {
+            storage: MapStorage::new(
+                flash,
+                const { MapConfig::new(CONFIG_FLASH_RANGE) },
+                NoCache::new(),
+            ),
+            data_buffer,
         };
-        flash.load().await;
-        flash
+        config_flash.load().await;
+        config_flash
     }
 
     pub async fn load(&mut self) {
@@ -34,27 +54,25 @@ impl ConfigFlash {
 
     async fn load_inner(&mut self) -> Result<(), ()> {
         let mut config_lock = CONFIG.lock().await;
-        let bytes = self.load_config_bytes_from_flash()?;
+        let bytes = self.load_config_bytes_from_flash().await?;
         *config_lock = Some(postcard::from_bytes::<Config>(&bytes).map_err(|_| ())?);
-
         Ok(())
     }
 
-    pub fn load_config_bytes_from_flash(&mut self) -> Result<Vec<u8, CONFIG_SIZE>, ()> {
-        // TODO: reduce stack usage
-        let mut bytes = [0u8; CONFIG_SIZE];
-        self.flash
-            .blocking_read(CONFIG_OFFSET as u32, &mut bytes)
-            .unwrap();
-        let size = u32::from_be_bytes(bytes[..4].try_into().unwrap());
-
-        let size = size as usize;
-        if size > CONFIG_SIZE - 4 {
-            error!("config bytes length prefix too long {}", size);
-            return Err(());
+    pub async fn load_config_bytes_from_flash(&mut self) -> Result<Vec<u8, CONFIG_SIZE>, ()> {
+        let storage = &mut self.storage;
+        let data_buffer = &mut *self.data_buffer;
+        let result: Option<&[u8]> = storage
+            .fetch_item::<&[u8]>(data_buffer, &CONFIG_KEY)
+            .await
+            .map_err(|_| ())?;
+        match result {
+            Some(bytes) => Vec::from_slice(bytes).map_err(|_| ()),
+            None => {
+                error!("No config found in flash");
+                Err(())
+            }
         }
-
-        Vec::from_slice(&bytes[4..4 + size]).map_err(|_| ())
     }
 
     pub fn check_valid_config(&self, bytes: &[u8]) -> Result<(), ()> {
@@ -66,34 +84,23 @@ impl ConfigFlash {
         &mut self,
         bytes: &Vec<u8, CONFIG_SIZE>,
     ) -> Result<(), ()> {
-        let size = bytes.len();
-        if size > CONFIG_SIZE {
-            error!("config bytes length prefix too long {}", size);
+        if bytes.len() > CONFIG_SIZE {
+            error!("config bytes too long {}", bytes.len());
             return Err(());
         }
-
         self.check_valid_config(bytes)?;
-        // TODO: Upstream this check, blocking_erase is not sound
-        let block_aligned_size = (4 + size as u32).div_ceil(4096) * 4096;
-        self.flash
-            .blocking_erase(
-                CONFIG_OFFSET as u32,
-                CONFIG_OFFSET as u32 + block_aligned_size,
-            )
-            .unwrap();
 
         {
-            let mut final_bytes: Vec<u8, CONFIG_SIZE> =
-                Vec::from_slice(&(size as u32).to_be_bytes()).unwrap();
-            final_bytes.extend_from_slice(bytes).unwrap();
-            self.flash
-                .blocking_write(CONFIG_OFFSET as u32, &final_bytes)
-                .unwrap();
-            defmt::info!("config of size {} written to flash", size.to_be_bytes());
-        } // drop final_bytes before the await so it is not stored in async task state
+            let storage = &mut self.storage;
+            let data_buffer = &mut *self.data_buffer;
+            let slice: &[u8] = bytes.as_slice();
+            storage
+                .store_item::<&[u8]>(data_buffer, &CONFIG_KEY, &slice)
+                .await
+                .map_err(|_| ())?;
+        }
 
         self.load().await;
-
         Ok(())
     }
 }
