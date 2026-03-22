@@ -1,3 +1,4 @@
+use dpedal_config::COBS_ACCUMULATOR_SIZE;
 use dpedal_config::web_config_protocol::{Request, Response};
 use futures::lock::Mutex;
 use postcard::accumulator::CobsAccumulator;
@@ -70,7 +71,7 @@ impl Device {
             .await
             .map_err(|e| format!("Failed to send request to device: {e}"))?;
 
-        let mut cobs_buf: CobsAccumulator<1024> = CobsAccumulator::new();
+        let mut cobs_buf: CobsAccumulator<COBS_ACCUMULATOR_SIZE> = CobsAccumulator::new();
         loop {
             let out = self
                 .usb

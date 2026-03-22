@@ -13,19 +13,19 @@ pub const CONFIG_OFFSET: usize = 1024 * 1024; // 1 MiB
 pub const CONFIG_AVAILABLE_SIZE: usize = 1024 * 1024; // 1 MiB
 pub const CONFIG_FLASH_RANGE: core::ops::Range<u32> =
     CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_AVAILABLE_SIZE as u32);
-/// How much space a single serialized Config object takes up in flash
-pub const CONFIG_SINGLE_SIZE: usize = 1024 * 12; // 12 KiB
+/// Upper bound on the serialized size of a single Meta struct (postcard format)
+pub const META_SERIALIZED_SIZE: usize = 256;
+/// Upper bound on the serialized size of a single Profile struct (postcard format)
+pub const PROFILE_SERIALIZED_SIZE: usize = 4096;
+/// Buffer size for COBS accumulator used in protocol messages (request and response)
+/// TODO: https://docs.rs/postcard/latest/postcard/experimental/max_size/index.html
+///       https://docs.rs/postcard/latest/postcard/experimental/fn.serialized_size.html
+pub const COBS_ACCUMULATOR_SIZE: usize = PROFILE_SERIALIZED_SIZE + 64;
 
 use defmt::Format;
 use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
-
-const fn assert_config_fits_in_flash() {
-    // TODO: This isnt actually accurate, since the data will be serialized into postcard format first.
-    //       Is there a way to calculate the maximum possible size in postcard format?
-    assert!(core::mem::size_of::<Config>() <= CONFIG_SINGLE_SIZE);
-}
 
 const fn assert_config_size_fits_into_writable_flash_blocks() {
     // Flash can only be written in blocks of 4096 bytes.
@@ -33,7 +33,6 @@ const fn assert_config_size_fits_into_writable_flash_blocks() {
     assert!(CONFIG_AVAILABLE_SIZE.is_multiple_of(4096));
 }
 
-const _: () = assert_config_fits_in_flash();
 const _: () = assert_config_size_fits_into_writable_flash_blocks();
 
 pub const MAX_PROFILES: usize = 5;
@@ -42,23 +41,62 @@ pub const MAX_PIN_REMAPPINGS: usize = 6;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Config {
-    pub version: u32,
-    pub nickname: String<MAX_NICKNAME_LEN>,
-    pub device: Device,
-    pub color: u32,
+    pub meta: Meta,
     pub profiles: Vec<Profile, MAX_PROFILES>,
-    pub pin_remappings: Vec<PinRemapping, MAX_PIN_REMAPPINGS>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            version: Default::default(),
+            meta: Meta::default(),
+            profiles: Vec::from_iter([Profile::default()]),
+        }
+    }
+}
+
+/// Device metadata: all config fields except profiles.
+/// Stored separately from profiles in flash to allow loading one profile at a time.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct Meta {
+    pub version: u32,
+    pub nickname: String<MAX_NICKNAME_LEN>,
+    pub device: Device,
+    pub color: u32,
+    pub pin_remappings: Vec<PinRemapping, MAX_PIN_REMAPPINGS>,
+}
+
+impl Default for Meta {
+    fn default() -> Self {
+        Self {
+            version: 0,
             nickname: String::try_from("my DPedal").unwrap(),
             device: Default::default(),
             color: 0x1790e3,
-            profiles: Vec::from_iter([Profile::default()]),
             pin_remappings: Default::default(),
+        }
+    }
+}
+
+/// Key type for MapStorage flash storage.
+/// Each variant corresponds to a distinct item stored in flash.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum ConfigKey {
+    /// Device metadata (everything except profiles)
+    Meta,
+    /// A single profile at the given index
+    Profile(u8),
+    /// The number of stored profiles (u8 stored as a single byte)
+    ProfileCount,
+}
+
+impl ConfigKey {
+    /// Returns the u8 value used as the key in MapStorage.
+    /// TODO: use a [u8; 2] or something
+    pub fn key(&self) -> u8 {
+        match self {
+            ConfigKey::Meta => 0,
+            ConfigKey::ProfileCount => 1,
+            ConfigKey::Profile(n) => 2 + n,
         }
     }
 }

@@ -2,7 +2,8 @@ use std::io::{self, Write};
 
 use crate::buffer_nor_flash::BufferNorFlash;
 use dpedal_config::{
-    CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, CONFIG_SINGLE_SIZE, FIRMWARE_OFFSET, FIRMWARE_SIZE,
+    CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, Config, ConfigKey, FIRMWARE_OFFSET, FIRMWARE_SIZE,
+    PROFILE_SERIALIZED_SIZE,
 };
 use miette::{Result, miette};
 use picoboot_rs::{
@@ -15,10 +16,8 @@ use sequential_storage::{
     map::{MapConfig, MapStorage},
 };
 
-const CONFIG_KEY: u8 = 0;
-
 pub enum WriteConfig {
-    Bytes(Vec<u8>),
+    Config(Box<Config>),
     Clear,
 }
 
@@ -28,15 +27,6 @@ pub fn flash_device(firmware: &[u8], config: WriteConfig) -> Result<()> {
             "Firmware is too large to flash, is {:?} bytes but must be less than or equal to {:?} bytes.",
             firmware.len(),
             FIRMWARE_SIZE
-        ));
-    }
-    if let WriteConfig::Bytes(config_bytes) = &config
-        && config_bytes.len() > CONFIG_SINGLE_SIZE
-    {
-        return Err(miette!(
-            "Config is too large to flash, is {:?} bytes but must be less than or equal to {:?} bytes.",
-            config_bytes.len(),
-            CONFIG_SINGLE_SIZE
         ));
     }
 
@@ -57,12 +47,8 @@ pub fn flash_device(firmware: &[u8], config: WriteConfig) -> Result<()> {
     println!();
 
     match config {
-        WriteConfig::Bytes(config_bytes) => {
-            println!(
-                "writing {} KB of config",
-                config_bytes.len() as f32 / 1000.0
-            );
-            flash_config(&mut conn, &config_bytes)?;
+        WriteConfig::Config(config) => {
+            flash_config(&mut conn, config)?;
         }
         WriteConfig::Clear => {
             println!("erasing config region");
@@ -84,7 +70,7 @@ pub fn flash_device(firmware: &[u8], config: WriteConfig) -> Result<()> {
     Ok(())
 }
 
-fn flash_config(conn: &mut PicobootConnection<Context>, config_bytes: &[u8]) -> Result<()> {
+fn flash_config(conn: &mut PicobootConnection<Context>, config: Box<Config>) -> Result<()> {
     let mut nor_flash = BufferNorFlash::new(CONFIG_AVAILABLE_SIZE);
     {
         let mut storage = MapStorage::new(
@@ -92,19 +78,56 @@ fn flash_config(conn: &mut PicobootConnection<Context>, config_bytes: &[u8]) -> 
             MapConfig::new(0..CONFIG_AVAILABLE_SIZE as u32),
             NoCache::new(),
         );
-        let mut data_buffer = vec![0u8; CONFIG_SINGLE_SIZE + 8];
-        futures::executor::block_on(storage.store_item::<&[u8]>(
+        let mut data_buffer = vec![0u8; PROFILE_SERIALIZED_SIZE + 32];
+
+        // Write Meta
+        futures::executor::block_on(
+            storage.store_item::<&[u8]>(
+                &mut data_buffer,
+                &ConfigKey::Meta.key(),
+                &postcard::to_stdvec(&config.meta)
+                    .map_err(|e| miette!(e))?
+                    .as_slice(),
+            ),
+        )
+        .map_err(|e| miette!("Failed to write meta to flash: {:?}", e))?;
+
+        // Write each Profile
+        for (i, profile) in config.profiles.iter().enumerate() {
+            futures::executor::block_on(
+                storage.store_item::<&[u8]>(
+                    &mut data_buffer,
+                    &ConfigKey::Profile(i as u8).key(),
+                    &postcard::to_stdvec(profile)
+                        .map_err(|e| miette!(e))?
+                        .as_slice(),
+                ),
+            )
+            .map_err(|e| miette!("Failed to write profile {} to flash: {:?}", i, e))?;
+        }
+
+        // Write ProfileCount
+        futures::executor::block_on(storage.store_item::<u8>(
             &mut data_buffer,
-            &CONFIG_KEY,
-            &config_bytes,
+            &ConfigKey::ProfileCount.key(),
+            &(config.profiles.len() as u8),
         ))
-        .map_err(|e| miette!("Failed to write config to flash: {:?}", e))?;
+        .map_err(|e| miette!("Failed to write profile count to flash: {:?}", e))?;
     }
     let buffer = nor_flash.into_buffer();
+
+    if buffer.len() > CONFIG_AVAILABLE_SIZE {
+        return Err(miette!(
+            "Config is too large to flash, is {:?} bytes but must be less than or equal to {:?} bytes.",
+            buffer.len(),
+            CONFIG_AVAILABLE_SIZE
+        ));
+    }
+    println!("writing {} KB of config", buffer.len() as f32 / 1000.0);
+
     // Erase all config flash but only write the number of config bytes that we actually have
     // This is done to ensure that old bits of config arent picked up by sequential-storage.
     // In theory this could happen as the items are left with valid headers/CDCs
-    //
     // TODO: It is however possible that with a better understanding of how sequential-storage works,
     // we could remove this logic, or reduce the amount that we erase, to make flashing process faster.
     erase_flash(conn, CONFIG_OFFSET, CONFIG_AVAILABLE_SIZE);
@@ -114,7 +137,7 @@ fn flash_config(conn: &mut PicobootConnection<Context>, config_bytes: &[u8]) -> 
 }
 
 fn erase_flash(conn: &mut PicobootConnection<Context>, offset: usize, size: usize) {
-    let num_sectors = size / PICO_SECTOR_SIZE as usize;
+    let num_sectors = size.div_ceil(PICO_SECTOR_SIZE as usize);
     for i in 0..num_sectors {
         if i.is_multiple_of(10) {
             print!("-");

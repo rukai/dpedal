@@ -1,9 +1,9 @@
 use defmt::*;
-use dpedal_config::CONFIG_SINGLE_SIZE;
+use dpedal_config::COBS_ACCUMULATOR_SIZE;
 use dpedal_config::web_config_protocol::{Request, Response};
 use embassy_rp::usb::{Endpoint, In, Out};
 use embassy_rp::{peripherals::USB, usb::Driver};
-//use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_usb::Builder;
 use embassy_usb::class::web_usb::{Config as WebUsbConfig, State, WebUsb};
 use embassy_usb::driver::{Endpoint as EndpointTrait, EndpointIn, EndpointOut};
@@ -12,7 +12,7 @@ use embassy_usb::types::InterfaceNumber;
 use postcard::accumulator::CobsAccumulator;
 use static_cell::StaticCell;
 
-use crate::config::ConfigFlash;
+use crate::config::{CONFIG_UPDATED, ConfigFlash};
 
 // This is a randomly generated GUID to allow clients on Windows to find our device
 const DEVICE_INTERFACE_GUIDS: &[&str] = &["{da327103-02a8-4d8a-8329-be81cdb97cc7}"];
@@ -20,16 +20,15 @@ const DEVICE_INTERFACE_GUIDS: &[&str] = &["{da327103-02a8-4d8a-8329-be81cdb97cc7
 pub struct WebConfig {
     write_ep: Endpoint<'static, USB, In>,
     read_ep: Endpoint<'static, USB, Out>,
-    config_flash: ConfigFlash,
-    cobs_buf: &'static mut CobsAccumulator<CONFIG_SINGLE_SIZE>,
+    config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
+    cobs_buf: &'static mut CobsAccumulator<COBS_ACCUMULATOR_SIZE>,
+    response_buf: &'static mut [u8; COBS_ACCUMULATOR_SIZE],
 }
-
-//pub static CONFIG_CHANNEL: Channel<ThreadModeRawMutex, (), 64> = Channel::new();
 
 impl WebConfig {
     pub fn new(
         builder: &mut Builder<'static, Driver<'static, USB>>,
-        config_flash: ConfigFlash,
+        config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
     ) -> Self {
         static WEBUSB_CONFIG: StaticCell<WebUsbConfig> = StaticCell::new();
         let webusb_config = WEBUSB_CONFIG.init(WebUsbConfig {
@@ -69,14 +68,18 @@ impl WebConfig {
         let write_ep = alt.endpoint_bulk_in(None, 64);
         let read_ep = alt.endpoint_bulk_out(None, 64);
 
-        static COBS_BUF: StaticCell<CobsAccumulator<CONFIG_SINGLE_SIZE>> = StaticCell::new();
+        static COBS_BUF: StaticCell<CobsAccumulator<COBS_ACCUMULATOR_SIZE>> = StaticCell::new();
         let cobs_buf = COBS_BUF.init(CobsAccumulator::new());
+
+        static RESPONSE_BUF: StaticCell<[u8; COBS_ACCUMULATOR_SIZE]> = StaticCell::new();
+        let response_buf = RESPONSE_BUF.init([0u8; COBS_ACCUMULATOR_SIZE]);
 
         Self {
             write_ep,
             read_ep,
             config_flash,
             cobs_buf,
+            response_buf,
         }
     }
 
@@ -101,7 +104,7 @@ impl WebConfig {
                 match self.cobs_buf.feed::<Request>(&packet_buf[..n]) {
                     postcard::accumulator::FeedResult::Consumed => {}
                     postcard::accumulator::FeedResult::OverFull(_items) => {
-                        error!("request exceeded 1024 bytes");
+                        error!("request exceeded buffer");
                         self.send_response(Response::ProtocolError).await;
                         continue 'skip_request;
                     }
@@ -114,20 +117,43 @@ impl WebConfig {
                 }
             };
             let response = match request {
-                Request::GetConfig => {
-                    Response::GetConfig(self.config_flash.load_config_bytes_from_flash().await)
+                Request::GetMeta => {
+                    Response::GetMeta(self.config_flash.lock().await.load_meta_bytes().await)
                 }
-                Request::SetConfig(config_bytes) => {
-                    defmt::info!("set config {:?}", config_bytes.as_slice());
-                    if let Err(()) = self
-                        .config_flash
-                        .store_config_bytes_to_flash_and_reload_config(&config_bytes)
+                Request::GetProfileCount => {
+                    let count = self.config_flash.lock().await.get_profile_count().await;
+                    Response::GetProfileCount(count)
+                }
+                Request::GetProfile(index) => Response::GetProfile(
+                    self.config_flash
+                        .lock()
                         .await
-                    {
-                        // TODO: return error over protocol
-                        defmt::panic!("Config invalid, not writing to flash")
-                    }
-                    Response::SetConfig
+                        .load_profile_bytes(index)
+                        .await,
+                ),
+                Request::SetMeta(bytes) => {
+                    defmt::info!("set meta");
+                    let result = self
+                        .config_flash
+                        .lock()
+                        .await
+                        .store_meta(bytes.as_slice())
+                        .await;
+                    Response::SetMeta(result)
+                }
+                Request::AddProfile(bytes) => {
+                    defmt::info!("add profile");
+                    let result = self
+                        .config_flash
+                        .lock()
+                        .await
+                        .add_profile(bytes.as_slice())
+                        .await;
+                    Response::AddProfile(result)
+                }
+                Request::ReloadConfig => {
+                    CONFIG_UPDATED.sender().send(());
+                    Response::ReloadConfig
                 }
             };
 
@@ -136,8 +162,8 @@ impl WebConfig {
     }
 
     async fn send_response(&mut self, response: Response) {
-        let mut response_buf = [0; 1024];
-        let response = postcard::to_slice_cobs(&response, &mut response_buf).unwrap();
+        let response =
+            postcard::to_slice_cobs(&response, self.response_buf.as_mut_slice()).unwrap();
         info!("responded with message containing {} bytes", response.len());
         for chunk in response.chunks(64) {
             if !chunk.is_empty() {
