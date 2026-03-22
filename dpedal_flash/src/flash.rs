@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use crate::buffer_nor_flash::BufferNorFlash;
 use dpedal_config::{
     CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, CONFIG_SINGLE_SIZE, FIRMWARE_OFFSET, FIRMWARE_SIZE,
@@ -116,6 +118,7 @@ fn erase_flash(conn: &mut PicobootConnection<Context>, offset: usize, size: usiz
     for i in 0..num_sectors {
         if i.is_multiple_of(10) {
             print!("-");
+            io::stdout().flush().unwrap();
         }
         let addr = offset as u32 + (i as u32) * PICO_SECTOR_SIZE + PICO_FLASH_START;
         conn.flash_erase(addr, PICO_SECTOR_SIZE)
@@ -127,6 +130,7 @@ fn write_flash(conn: &mut PicobootConnection<Context>, data: &[u8], offset: usiz
     for (i, page) in bin_pages(data).iter().enumerate() {
         if i.is_multiple_of(10) {
             print!(".");
+            io::stdout().flush().unwrap();
         }
         let addr = offset as u32 + (i as u32) * PICO_PAGE_SIZE + PICO_FLASH_START;
 
