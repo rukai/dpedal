@@ -7,9 +7,14 @@ pub const RP2040_FLASH_OFFSET: usize = 0x10000000;
 pub const PICO_FLASH_SIZE: usize = 1024 * 1024 * 2; // 2 MiB
 
 pub const FIRMWARE_OFFSET: usize = 0;
-pub const FIRMWARE_SIZE: usize = 1024 * 2000; // 2000 KiB
-pub const CONFIG_OFFSET: usize = 1024 * 2000;
-pub const CONFIG_SIZE: usize = 1024 * 12; // 12 KiB // TODO: This is used to allocate space for config stored under different conditions e.g. serialized by different serialization techniques. At high config usage we could get weird failures. Need to clarify these usages.
+pub const FIRMWARE_SIZE: usize = 1024 * 1024; // 1 MiB
+pub const CONFIG_OFFSET: usize = 1024 * 1024; // 1 MiB
+/// How much space in flash is available for storing config (handed to MapStorage for wear leveling)
+pub const CONFIG_AVAILABLE_SIZE: usize = 1024 * 1024; // 1 MiB
+pub const CONFIG_FLASH_RANGE: core::ops::Range<u32> =
+    CONFIG_OFFSET as u32..(CONFIG_OFFSET as u32 + CONFIG_AVAILABLE_SIZE as u32);
+/// How much space a single serialized Config object takes up in flash
+pub const CONFIG_SINGLE_SIZE: usize = 1024 * 12; // 12 KiB
 
 use defmt::Format;
 use heapless::{String, Vec};
@@ -19,13 +24,13 @@ use strum::{EnumIter, EnumString, IntoEnumIterator, IntoStaticStr};
 const fn assert_config_fits_in_flash() {
     // TODO: This isnt actually accurate, since the data will be serialized into postcard format first.
     //       Is there a way to calculate the maximum possible size in postcard format?
-    assert!(core::mem::size_of::<Config>() <= CONFIG_SIZE);
+    assert!(core::mem::size_of::<Config>() <= CONFIG_SINGLE_SIZE);
 }
 
 const fn assert_config_size_fits_into_writable_flash_blocks() {
     // Flash can only be written in blocks of 4096 bytes.
     assert!(CONFIG_OFFSET.is_multiple_of(4096));
-    assert!(CONFIG_SIZE.is_multiple_of(4096));
+    assert!(CONFIG_AVAILABLE_SIZE.is_multiple_of(4096));
 }
 
 const _: () = assert_config_fits_in_flash();

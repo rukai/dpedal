@@ -18,6 +18,9 @@ kdl_config = { git = "https://github.com/rukai/kdl_config", features = ["heaples
 kdl_config_derive = { git = "https://github.com/rukai/kdl_config" }
 heapless = { workspace = true }
 postcard = { version = "1.1.3", features = ["use-std"] }
+sequential-storage = "7"
+embedded-storage-async = "0.4.1"
+futures = { version = "0.3", features = ["executor"] }
 
 # workaround https://gitlab.com/robigalia/ssmarshal/-/merge_requests/2
 # TODO: lets just eradicate this unmaintained thing from the dep tree entirely

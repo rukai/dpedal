@@ -34,6 +34,7 @@ static_cell = "2.1.1"
 dpedal_config = { path = "../dpedal_config"}
 postcard = "1.1.3"
 heapless = { version = "0.8", default-features = false, features = ["serde"] }
+sequential-storage = "7"
 
 [profile.release]
 codegen-units = 1

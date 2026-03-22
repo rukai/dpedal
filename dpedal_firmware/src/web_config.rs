@@ -1,5 +1,5 @@
 use defmt::*;
-use dpedal_config::CONFIG_SIZE;
+use dpedal_config::CONFIG_SINGLE_SIZE;
 use dpedal_config::web_config_protocol::{Request, Response};
 use embassy_rp::usb::{Endpoint, In, Out};
 use embassy_rp::{peripherals::USB, usb::Driver};
@@ -21,7 +21,7 @@ pub struct WebConfig {
     write_ep: Endpoint<'static, USB, In>,
     read_ep: Endpoint<'static, USB, Out>,
     config_flash: ConfigFlash,
-    cobs_buf: &'static mut CobsAccumulator<CONFIG_SIZE>,
+    cobs_buf: &'static mut CobsAccumulator<CONFIG_SINGLE_SIZE>,
 }
 
 //pub static CONFIG_CHANNEL: Channel<ThreadModeRawMutex, (), 64> = Channel::new();
@@ -69,7 +69,7 @@ impl WebConfig {
         let write_ep = alt.endpoint_bulk_in(None, 64);
         let read_ep = alt.endpoint_bulk_out(None, 64);
 
-        static COBS_BUF: StaticCell<CobsAccumulator<CONFIG_SIZE>> = StaticCell::new();
+        static COBS_BUF: StaticCell<CobsAccumulator<CONFIG_SINGLE_SIZE>> = StaticCell::new();
         let cobs_buf = COBS_BUF.init(CobsAccumulator::new());
 
         Self {
@@ -115,7 +115,7 @@ impl WebConfig {
             };
             let response = match request {
                 Request::GetConfig => {
-                    Response::GetConfig(self.config_flash.load_config_bytes_from_flash())
+                    Response::GetConfig(self.config_flash.load_config_bytes_from_flash().await)
                 }
                 Request::SetConfig(config_bytes) => {
                     defmt::info!("set config {:?}", config_bytes.as_slice());

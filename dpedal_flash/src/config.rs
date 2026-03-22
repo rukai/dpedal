@@ -8,16 +8,8 @@ use kdl_config::{
     error::{ParseDiagnostic, ParseError},
 };
 use kdl_config_derive::{KdlConfig, KdlConfigFinalize};
-use miette::{IntoDiagnostic, NamedSource, miette};
+use miette::{IntoDiagnostic, NamedSource};
 use std::{path::PathBuf, str::FromStr};
-
-pub fn encode_config(config: &Config) -> miette::Result<Vec<u8>> {
-    let bytes = postcard::to_stdvec(config).map_err(|e| miette!(e))?;
-    let mut result = Vec::new();
-    result.extend((bytes.len() as u32).to_be_bytes());
-    result.extend(bytes.iter());
-    Ok(result)
-}
 
 pub fn load(path: Option<PathBuf>) -> miette::Result<Config> {
     let input = load_source(path)?;

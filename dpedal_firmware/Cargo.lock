@@ -377,6 +377,7 @@ dependencies = [
  "panic-probe",
  "portable-atomic",
  "postcard",
+ "sequential-storage",
  "static_cell",
  "usbd-hid",
 ]
@@ -1317,6 +1318,15 @@ name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
+
+[[package]]
+name = "sequential-storage"
+version = "7.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4580ee0fa08cd41bee9f5b50ed309877e18735370fd4eef5766cc82863ef772"
+dependencies = [
+ "embedded-storage-async",
+]
 
 [[package]]
 name = "serde"

@@ -1,7 +1,8 @@
+use crate::flash::WriteConfig;
 use clap::Parser;
-use dpedal_config::CONFIG_SIZE;
-use miette::Result;
+use miette::{Result, miette};
 
+pub mod buffer_nor_flash;
 pub mod cli;
 pub mod config;
 pub mod elf;
@@ -15,13 +16,14 @@ fn main() -> Result<()> {
     let firmware_bytes = elf::elf_to_bin(include_bytes!(env!("FIRMWARE_PATH")))?;
 
     let cli = cli::Args::parse();
-    let config_bytes = if cli.erase_config {
-        vec![0; CONFIG_SIZE]
+    let config = if cli.erase_config {
+        WriteConfig::Clear
     } else {
         let config = config::load(cli.path)?;
-        config::encode_config(&config)?
+        let bytes = postcard::to_stdvec(&config).map_err(|e| miette!(e))?;
+        WriteConfig::Bytes(bytes)
     };
-    flash::flash_device(&firmware_bytes, &config_bytes)?;
+    flash::flash_device(&firmware_bytes, config)?;
 
     println!("Succesfully flashed!");
     Ok(())
