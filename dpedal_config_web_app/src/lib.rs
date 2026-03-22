@@ -1,4 +1,3 @@
-use dpedal_config::CONFIG_SINGLE_SIZE;
 use dpedal_config::ComputerInput;
 use dpedal_config::Config;
 use dpedal_config::DPedalControl;
@@ -13,6 +12,7 @@ use dpedal_config::MAX_PIN_REMAPPINGS;
 use dpedal_config::MAX_PROFILES;
 use dpedal_config::Mapping;
 use dpedal_config::MappingMode;
+use dpedal_config::Meta;
 use dpedal_config::MouseInput;
 use dpedal_config::PinRemapping;
 use dpedal_config::Profile;
@@ -99,13 +99,13 @@ async fn open_device(devices: DeviceList) {
     save_result.set_text_content(None);
 
     let device_type: HtmlElement = document.get_element("device_type");
-    device_type.set_inner_text(<&str>::from(&config.device));
+    device_type.set_inner_text(<&str>::from(&config.meta.device));
 
     let name: HtmlInputElement = document.get_element("device_name");
-    name.set_value(config.nickname.as_ref());
+    name.set_value(config.meta.nickname.as_ref());
 
     let color: HtmlInputElement = document.get_element("device_color");
-    color.set_value(&format!("#{:0>6x}", config.color));
+    color.set_value(&format!("#{:0>6x}", config.meta.color));
 
     for (i, profile) in config.profiles.iter().enumerate() {
         gen_for_profile(&document, profile, i);
@@ -136,9 +136,9 @@ async fn open_device(devices: DeviceList) {
     }
 
     let preserved = PreservedConfig {
-        version: config.version,
-        device: config.device,
-        pin_remappings: config.pin_remappings,
+        version: config.meta.version,
+        device: config.meta.device,
+        pin_remappings: config.meta.pin_remappings,
     };
 
     set_button_on_click(
@@ -195,7 +195,7 @@ async fn write_config(
     preserved: PreservedConfig,
 ) -> Result<(), String> {
     let profiles_container: Element = document.get_element("profiles-container");
-    let mut profiles = heapless::Vec::new();
+    let mut profiles = vec![];
 
     for profile_section in ElementChildIter::new(&profiles_container) {
         let mut section_children = ElementChildIter::new(&profile_section);
@@ -230,7 +230,7 @@ async fn write_config(
                 .unwrap();
         }
 
-        profiles.push(Profile { mappings }).unwrap();
+        profiles.push(Profile { mappings });
     }
 
     let name: HtmlInputElement = document.get_element("device_name");
@@ -244,22 +244,48 @@ async fn write_config(
     let color_element: HtmlInputElement = document.get_element("device_color");
     let color = u32::from_str_radix(color_element.value().strip_prefix("#").unwrap(), 16).unwrap();
 
-    let config = Config {
+    let meta = Meta {
         version: preserved.version,
         nickname,
         device: preserved.device,
         color,
-        profiles,
         pin_remappings: preserved.pin_remappings,
     };
 
-    let config_bytes_std = postcard::to_stdvec(&config).unwrap();
-    let config_bytes: heapless::Vec<u8, CONFIG_SINGLE_SIZE> =
-        heapless::Vec::from_slice(&config_bytes_std).unwrap();
-    device
-        .send_request(&Request::SetConfig(config_bytes))
-        .await?;
-    log::info!("config written {:#?}", config);
+    // Send meta (resets profile count to 0 on device)
+    let meta_bytes_std = postcard::to_stdvec(&meta).unwrap();
+    let meta_bytes = heapless::Vec::from_slice(&meta_bytes_std)
+        .map_err(|_| "Serialized meta exceeds META_SERIALIZED_SIZE".to_string())?;
+    match device.send_request(&Request::SetMeta(meta_bytes)).await? {
+        Response::SetMeta(Ok(())) => {}
+        Response::SetMeta(Err(())) => return Err("Device failed to write meta to flash".into()),
+        other => return Err(format!("Unexpected response to SetMeta: {other:?}")),
+    }
+
+    // Send each profile
+    for profile in &profiles {
+        let profile_bytes_std = postcard::to_stdvec(profile).unwrap();
+        let profile_bytes = heapless::Vec::from_slice(&profile_bytes_std)
+            .map_err(|_| "Serialized profile exceeds PROFILE_SERIALIZED_SIZE".to_string())?;
+        match device
+            .send_request(&Request::AddProfile(profile_bytes))
+            .await?
+        {
+            Response::AddProfile(Ok(())) => {}
+            Response::AddProfile(Err(())) => {
+                return Err("Device failed to write profile to flash".into());
+            }
+            other => return Err(format!("Unexpected response to AddProfile: {other:?}")),
+        }
+    }
+
+    // Trigger firmware reload
+    match device.send_request(&Request::ReloadConfig).await? {
+        Response::ReloadConfig => {}
+        other => return Err(format!("Unexpected response to ReloadConfig: {other:?}")),
+    }
+
+    log::info!("config written {:#?}", meta);
 
     Ok(())
 }
@@ -325,15 +351,35 @@ fn parse_output_span(output_span: &Element) -> Option<ComputerInput> {
 }
 
 async fn request_get_config(device: &Device) -> Result<Config, String> {
-    let response = device.send_request(&Request::GetConfig).await?;
-    match response {
-        Response::GetConfig(config_bytes) => {
-            postcard::from_bytes::<Config>(&config_bytes.map_err(|e| format!("{e:?}"))?)
-                .map_err(|e| format!("{e:?}"))
-        }
-        Response::SetConfig => panic!("Unexpected dpedal response"),
-        Response::ProtocolError => panic!("dpedal protocol error"),
+    // Fetch meta
+    let meta_bytes = match device.send_request(&Request::GetMeta).await? {
+        Response::GetMeta(result) => result.map_err(|e| format!("{e:?}"))?,
+        other => return Err(format!("Unexpected response to GetMeta: {other:?}")),
+    };
+    let meta =
+        postcard::from_bytes::<dpedal_config::Meta>(&meta_bytes).map_err(|e| format!("{e}"))?;
+
+    // Fetch profile count
+    let profile_count = match device.send_request(&Request::GetProfileCount).await? {
+        Response::GetProfileCount(count) => count,
+        other => return Err(format!("Unexpected response to GetProfileCount: {other:?}")),
+    };
+
+    // Fetch each profile
+    let mut profiles = heapless::Vec::new();
+    for i in 0..profile_count {
+        let profile_bytes = match device.send_request(&Request::GetProfile(i)).await? {
+            Response::GetProfile(result) => result.map_err(|e| format!("{e:?}"))?,
+            other => return Err(format!("Unexpected response to GetProfile({i}): {other:?}")),
+        };
+        let profile =
+            postcard::from_bytes::<Profile>(&profile_bytes).map_err(|e| format!("{e}"))?;
+        profiles
+            .push(profile)
+            .map_err(|_| "Too many profiles".to_string())?;
     }
+
+    Ok(Config { meta, profiles })
 }
 
 fn gen_for_profile(document: &Document, profile: &Profile, index: usize) {

@@ -1,6 +1,6 @@
 use crate::flash::WriteConfig;
 use clap::Parser;
-use miette::{Result, miette};
+use miette::Result;
 
 pub mod buffer_nor_flash;
 pub mod cli;
@@ -19,9 +19,7 @@ fn main() -> Result<()> {
     let config = if cli.erase_config {
         WriteConfig::Clear
     } else {
-        let config = config::load(cli.path)?;
-        let bytes = postcard::to_stdvec(&config).map_err(|e| miette!(e))?;
-        WriteConfig::Bytes(bytes)
+        WriteConfig::Config(Box::new(config::load(cli.path)?))
     };
     flash::flash_device(&firmware_bytes, config)?;
 

@@ -36,9 +36,10 @@ async fn main(_spawner: Spawner) {
 
     let config_flash = ConfigFlash::new(p.FLASH, p.DMA_CH0).await;
 
-    let mut builder = usb::usb_builder(p.USB).await;
+    let mut builder = usb::usb_builder(p.USB, config_flash).await;
 
     let mut web_config = WebConfig::new(&mut builder, config_flash);
+
     let mut keyboard = Keyboard::new(&mut builder);
     let mut mouse = Mouse::new(&mut builder);
 
@@ -47,38 +48,41 @@ async fn main(_spawner: Spawner) {
     // Run the USB device.
     let usb_fut = usb.run();
 
-    let mut inputs = Inputs::new([
-        Some(p.PIN_0.into()),
-        Some(p.PIN_1.into()),
-        Some(p.PIN_2.into()),
-        Some(p.PIN_3.into()),
-        Some(p.PIN_4.into()),
-        Some(p.PIN_5.into()),
-        Some(p.PIN_6.into()),
-        Some(p.PIN_7.into()),
-        Some(p.PIN_8.into()),
-        Some(p.PIN_9.into()),
-        Some(p.PIN_10.into()),
-        Some(p.PIN_11.into()),
-        Some(p.PIN_12.into()),
-        Some(p.PIN_13.into()),
-        Some(p.PIN_14.into()),
-        Some(p.PIN_15.into()),
-        Some(p.PIN_16.into()),
-        Some(p.PIN_17.into()),
-        Some(p.PIN_18.into()),
-        Some(p.PIN_19.into()),
-        Some(p.PIN_20.into()),
-        Some(p.PIN_21.into()),
-        Some(p.PIN_22.into()),
-        Some(p.PIN_23.into()),
-        Some(p.PIN_24.into()),
-        Some(p.PIN_25.into()),
-        Some(p.PIN_26.into()),
-        Some(p.PIN_27.into()),
-        Some(p.PIN_28.into()),
-        Some(p.PIN_29.into()),
-    ]);
+    let mut inputs = Inputs::new(
+        config_flash,
+        [
+            Some(p.PIN_0.into()),
+            Some(p.PIN_1.into()),
+            Some(p.PIN_2.into()),
+            Some(p.PIN_3.into()),
+            Some(p.PIN_4.into()),
+            Some(p.PIN_5.into()),
+            Some(p.PIN_6.into()),
+            Some(p.PIN_7.into()),
+            Some(p.PIN_8.into()),
+            Some(p.PIN_9.into()),
+            Some(p.PIN_10.into()),
+            Some(p.PIN_11.into()),
+            Some(p.PIN_12.into()),
+            Some(p.PIN_13.into()),
+            Some(p.PIN_14.into()),
+            Some(p.PIN_15.into()),
+            Some(p.PIN_16.into()),
+            Some(p.PIN_17.into()),
+            Some(p.PIN_18.into()),
+            Some(p.PIN_19.into()),
+            Some(p.PIN_20.into()),
+            Some(p.PIN_21.into()),
+            Some(p.PIN_22.into()),
+            Some(p.PIN_23.into()),
+            Some(p.PIN_24.into()),
+            Some(p.PIN_25.into()),
+            Some(p.PIN_26.into()),
+            Some(p.PIN_27.into()),
+            Some(p.PIN_28.into()),
+            Some(p.PIN_29.into()),
+        ],
+    );
 
     embassy_futures::join::join5(
         usb_fut,

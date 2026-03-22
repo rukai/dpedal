@@ -1,6 +1,7 @@
 use dpedal_config::{
     ComputerInput, Config, DpedalInput, KeyboardInput, MAX_COMPUTER_INPUTS, MAX_DPEDAL_INPUTS,
-    MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MappingMode, MouseInput,
+    MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MappingMode, Meta,
+    MouseInput,
 };
 use kdl::{KdlDocument, KdlNode};
 use kdl_config::{
@@ -48,8 +49,7 @@ fn load_source(path: Option<PathBuf>) -> miette::Result<NamedSource<String>> {
     Ok(NamedSource::new(filename, text))
 }
 
-#[derive(KdlConfig, KdlConfigFinalize, Default, Debug)]
-#[kdl_config_finalize_into = "dpedal_config::Config"]
+#[derive(KdlConfig, Default, Debug)]
 pub struct ConfigKdl {
     pub version: Parsed<u32>,
     pub nickname: Parsed<heapless::String<MAX_NICKNAME_LEN>>,
@@ -58,6 +58,23 @@ pub struct ConfigKdl {
     pub profiles: Parsed<heapless::Vec<Parsed<ProfileKdl>, MAX_PROFILES>>,
     // TODO: add validation: no duplicate pins (including default values), valid pin range
     pub pin_remappings: Parsed<heapless::Vec<Parsed<PinRemappingKdl>, MAX_PIN_REMAPPINGS>>,
+}
+
+impl KdlConfigFinalize for ConfigKdl {
+    type FinalizeType = Config;
+
+    fn finalize(&self) -> Self::FinalizeType {
+        Config {
+            meta: Meta {
+                version: self.version.value.finalize(),
+                nickname: self.nickname.value.finalize(),
+                device: self.device.value.finalize(),
+                color: self.color.value.finalize(),
+                pin_remappings: self.pin_remappings.value.finalize(),
+            },
+            profiles: self.profiles.value.finalize(),
+        }
+    }
 }
 
 #[derive(KdlConfig, KdlConfigFinalize, Default, Debug)]

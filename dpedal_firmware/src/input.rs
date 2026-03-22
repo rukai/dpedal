@@ -1,22 +1,27 @@
-use crate::config::{CONFIG, CONFIG_UPDATED};
+use crate::config::{CONFIG_UPDATED, ConfigFlash};
 use crate::mapping_state::MappingState;
 use core::ops::ControlFlow;
-use dpedal_config::{DpedalInput, MAX_MAPPINGS, MAX_PROFILES, Profile};
+use dpedal_config::{DpedalInput, MAX_MAPPINGS, Profile};
 use embassy_rp::gpio::{AnyPin, Input, Pin, Pull};
 use embassy_rp::{Peri, PeripheralType};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::Timer;
 use heapless::Vec;
 use static_cell::StaticCell;
 
-static PROFILES: StaticCell<Vec<Profile, MAX_PROFILES>> = StaticCell::new();
+static CURRENT_PROFILE: StaticCell<Profile> = StaticCell::new();
 
 pub struct Inputs {
     pins: [Option<Peri<'static, AnyPin>>; 30],
+    config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
 }
 
 impl Inputs {
-    pub fn new(pins: [Option<Peri<'static, AnyPin>>; 30]) -> Self {
-        Inputs { pins }
+    pub fn new(
+        config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
+        pins: [Option<Peri<'static, AnyPin>>; 30],
+    ) -> Self {
+        Inputs { pins, config_flash }
     }
 
     pub async fn process(&mut self) {
@@ -29,26 +34,26 @@ impl Inputs {
         let mut dpad_left_pin = 17;
         let mut dpad_right_pin = 22;
 
-        let profiles = {
-            // Wait for initial config load
-            rx.get().await;
-            let config = CONFIG.lock().await;
-            let config = config.as_ref().unwrap();
-
-            // pin_remappings cant be set by the web configurator, so we dont need to worry about resetting this after web configuration occurs.
-            for remapping in &config.pin_remappings {
-                match remapping.input {
-                    DpedalInput::DpadUp => dpad_up_pin = remapping.pin as usize,
-                    DpedalInput::DpadDown => dpad_down_pin = remapping.pin as usize,
-                    DpedalInput::DpadLeft => dpad_left_pin = remapping.pin as usize,
-                    DpedalInput::DpadRight => dpad_right_pin = remapping.pin as usize,
-                    DpedalInput::ButtonLeft => button_left_pin = remapping.pin as usize,
-                    DpedalInput::ButtonRight => button_right_pin = remapping.pin as usize,
-                }
-            }
-
-            PROFILES.init(config.profiles.clone())
+        // Load initial config
+        let meta = self.config_flash.lock().await.load_meta().await;
+        let current_profile = {
+            // TODO: currently handles config with 0 profiles by loading the default profile which has mappings in it.
+            //       this is unintuitive and should be changed.
+            let profile = self.config_flash.lock().await.load_profile(0).await;
+            CURRENT_PROFILE.init(profile)
         };
+
+        // Apply pin remappings from meta (set once; remappings not editable via web configurator)
+        for remapping in &meta.pin_remappings {
+            match remapping.input {
+                DpedalInput::DpadUp => dpad_up_pin = remapping.pin as usize,
+                DpedalInput::DpadDown => dpad_down_pin = remapping.pin as usize,
+                DpedalInput::DpadLeft => dpad_left_pin = remapping.pin as usize,
+                DpedalInput::DpadRight => dpad_right_pin = remapping.pin as usize,
+                DpedalInput::ButtonLeft => button_left_pin = remapping.pin as usize,
+                DpedalInput::ButtonRight => button_right_pin = remapping.pin as usize,
+            }
+        }
 
         let button_left = input(self.pins[button_left_pin].take().unwrap());
         let button_right = input(self.pins[button_right_pin].take().unwrap());
@@ -58,43 +63,54 @@ impl Inputs {
         let dpad_right = input(self.pins[dpad_right_pin].take().unwrap());
 
         let mut state = State::new();
+        let mut loaded_profile_index: u8 = 0;
+
         'main_loop: loop {
-            // Detect config changes and update local config + clear state
+            // Detect config updates (ReloadConfig from web configurator); reset to profile 0
             if rx.try_changed().is_some() {
-                *profiles = CONFIG.lock().await.as_ref().unwrap().profiles.clone();
                 state = State::new();
+                loaded_profile_index = u8::MAX; // force reload via the block below
             }
 
-            if let Some(profile) = profiles.get(state.current_profile as usize) {
-                let input_state = DpedalInputState {
-                    button_left: button_left.is_low(),
-                    button_right: button_right.is_low(),
-                    dpad_up: dpad_up.is_low(),
-                    dpad_down: dpad_down.is_low(),
-                    dpad_left: dpad_left.is_low(),
-                    dpad_right: dpad_right.is_low(),
+            // Load new profile from flash when current profile changed
+            if state.current_profile != loaded_profile_index {
+                *current_profile = self
+                    .config_flash
+                    .lock()
+                    .await
+                    .load_profile(state.current_profile)
+                    .await;
+                loaded_profile_index = state.current_profile;
+                state.mapping_states.clear();
+            }
+
+            let input_state = DpedalInputState {
+                button_left: button_left.is_low(),
+                button_right: button_right.is_low(),
+                dpad_up: dpad_up.is_low(),
+                dpad_down: dpad_down.is_low(),
+                dpad_left: dpad_left.is_low(),
+                dpad_right: dpad_right.is_low(),
+            };
+
+            // Restore mapping state to full length in case it was cleared earlier
+            while current_profile.mappings.len() > state.mapping_states.len() {
+                if state.mapping_states.push(MappingState::new()).is_err() {
+                    defmt::panic!("mapping state overflow");
+                }
+            }
+
+            for (i, mapping) in current_profile.mappings.iter().enumerate() {
+                let all_pressed = input_state.is_all_pressed(&mapping.input_set);
+                state.mapping_states[i] = match state.mapping_states[i]
+                    .process(mapping, all_pressed, &mut state)
+                    .await
+                {
+                    ControlFlow::Continue(ms) => ms,
+                    ControlFlow::Break(()) => continue 'main_loop,
                 };
-
-                // Restore mapping state to full length in case it was cleared earlier
-                while profile.mappings.len() > state.mapping_states.len() {
-                    if state.mapping_states.push(MappingState::new()).is_err() {
-                        defmt::panic!("mapping state overflow");
-                    }
-                }
-
-                for (i, mapping) in profile.mappings.iter().enumerate() {
-                    let all_pressed = input_state.is_all_pressed(&mapping.input_set);
-                    state.mapping_states[i] = match state.mapping_states[i]
-                        .process(mapping, all_pressed, &mut state)
-                        .await
-                    {
-                        ControlFlow::Continue(ms) => ms,
-                        ControlFlow::Break(()) => continue 'main_loop,
-                    };
-                }
-            } else {
-                defmt::error!("No profile with index {}", state.current_profile)
             }
+
             Timer::after_millis(1).await;
         }
     }

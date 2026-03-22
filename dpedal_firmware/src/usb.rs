@@ -10,13 +10,17 @@ use embassy_usb::{Builder, Config, Handler};
 use heapless::String;
 use static_cell::StaticCell;
 
-use crate::config::CONFIG;
+use crate::config::ConfigFlash;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
 });
 
-pub async fn usb_builder(usb: Peri<'static, USB>) -> Builder<'static, Driver<'static, USB>> {
+pub async fn usb_builder(
+    usb: Peri<'static, USB>,
+    config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
+) -> Builder<'static, Driver<'static, USB>> {
     let driver = Driver::new(usb, Irqs);
 
     // Create embassy-usb DeviceBuilder using the driver and config.
@@ -31,7 +35,7 @@ pub async fn usb_builder(usb: Peri<'static, USB>) -> Builder<'static, Driver<'st
     let mut config = Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("Rukai");
     let product = PRODUCT_NAME.init(String::try_from("DPedal").unwrap());
-    let nickname = CONFIG.lock().await.as_ref().unwrap().nickname.clone();
+    let nickname = config_flash.lock().await.load_meta().await.nickname;
     if !nickname.is_empty() {
         product.push_str(" - ").unwrap();
         product.push_str(&nickname).unwrap();
