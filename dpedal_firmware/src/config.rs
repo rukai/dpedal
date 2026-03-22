@@ -60,7 +60,8 @@ impl ConfigFlash {
     pub async fn load_config_bytes_from_flash(
         &mut self,
     ) -> Result<Vec<u8, CONFIG_SINGLE_SIZE>, ()> {
-        let result = self.storage
+        let result = self
+            .storage
             .fetch_item::<&[u8]>(self.data_buffer, &CONFIG_KEY)
             .await
             .map_err(|_| ())?;

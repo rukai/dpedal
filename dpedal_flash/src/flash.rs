@@ -1,7 +1,6 @@
-use crate::picoboot_nor_flash::PicobootNorFlash;
+use crate::buffer_nor_flash::BufferNorFlash;
 use dpedal_config::{
-    CONFIG_AVAILABLE_SIZE, CONFIG_FLASH_RANGE, CONFIG_OFFSET, CONFIG_SINGLE_SIZE, FIRMWARE_OFFSET,
-    FIRMWARE_SIZE,
+    CONFIG_AVAILABLE_SIZE, CONFIG_OFFSET, CONFIG_SINGLE_SIZE, FIRMWARE_OFFSET, FIRMWARE_SIZE,
 };
 use miette::{Result, miette};
 use picoboot_rs::{
@@ -51,7 +50,9 @@ pub fn flash_device(firmware: &[u8], config: WriteConfig) -> Result<()> {
     conn.exit_xip().expect("failed to exit from xip mode");
 
     println!("writing {} KB of firmware", firmware.len() as f32 / 1000.0);
-    flash_bytes_at_offset(&mut conn, firmware, FIRMWARE_OFFSET);
+    erase_flash(&mut conn, FIRMWARE_OFFSET, firmware.len());
+    write_flash(&mut conn, firmware, FIRMWARE_OFFSET);
+    println!();
 
     match config {
         WriteConfig::Bytes(config_bytes) => {
@@ -63,7 +64,8 @@ pub fn flash_device(firmware: &[u8], config: WriteConfig) -> Result<()> {
         }
         WriteConfig::Clear => {
             println!("erasing config region");
-            erase_config_region(&mut conn);
+            erase_flash(&mut conn, CONFIG_OFFSET, CONFIG_AVAILABLE_SIZE);
+            println!();
         }
     }
 
@@ -81,11 +83,11 @@ pub fn flash_device(firmware: &[u8], config: WriteConfig) -> Result<()> {
 }
 
 fn flash_config(conn: &mut PicobootConnection<Context>, config_bytes: &[u8]) -> Result<()> {
-    let mut nor_flash = PicobootNorFlash::new(conn);
+    let mut nor_flash = BufferNorFlash::new(CONFIG_AVAILABLE_SIZE);
     {
         let mut storage = MapStorage::new(
             &mut nor_flash,
-            MapConfig::new(CONFIG_FLASH_RANGE),
+            MapConfig::new(0..CONFIG_AVAILABLE_SIZE as u32),
             NoCache::new(),
         );
         let mut data_buffer = vec![0u8; CONFIG_SINGLE_SIZE + 8];
@@ -96,32 +98,33 @@ fn flash_config(conn: &mut PicobootConnection<Context>, config_bytes: &[u8]) -> 
         ))
         .map_err(|e| miette!("Failed to write config to flash: {:?}", e))?;
     }
-    // Flush the page buffer explicitly to propagate any write errors
-    nor_flash.flush().map_err(|e| miette!("{e}"))?;
+    let buffer = nor_flash.into_buffer();
+    // Erase all config flash but only write the number of config bytes that we actually have
+    // This is done to ensure that old bits of config arent picked up by sequential-storage.
+    // In theory this could happen as the items are left with valid headers/CDCs
+    //
+    // TODO: It is however possible that with a better understanding of how sequential-storage works,
+    // we could remove this logic, or reduce the amount that we erase, to make flashing process faster.
+    erase_flash(conn, CONFIG_OFFSET, CONFIG_AVAILABLE_SIZE);
+    write_flash(conn, &buffer, CONFIG_OFFSET);
     println!();
     Ok(())
 }
 
-fn erase_config_region(conn: &mut PicobootConnection<Context>) {
-    let zeros = vec![0u8; CONFIG_AVAILABLE_SIZE];
-    flash_bytes_at_offset(conn, &zeros, CONFIG_OFFSET);
-}
-
-fn flash_bytes_at_offset(conn: &mut PicobootConnection<Context>, data: &[u8], offset: usize) {
-    let fw_pages = bin_pages(data);
-    // erase space on flash
-    for (i, _) in fw_pages.iter().enumerate() {
+fn erase_flash(conn: &mut PicobootConnection<Context>, offset: usize, size: usize) {
+    let num_sectors = size / PICO_SECTOR_SIZE as usize;
+    for i in 0..num_sectors {
         if i.is_multiple_of(10) {
             print!("-");
         }
-        let addr = offset as u32 + (i as u32) * PICO_PAGE_SIZE + PICO_FLASH_START;
-        if addr.is_multiple_of(PICO_SECTOR_SIZE) {
-            conn.flash_erase(addr, PICO_SECTOR_SIZE)
-                .expect("failed to erase flash");
-        }
+        let addr = offset as u32 + (i as u32) * PICO_SECTOR_SIZE + PICO_FLASH_START;
+        conn.flash_erase(addr, PICO_SECTOR_SIZE)
+            .expect("failed to erase flash");
     }
+}
 
-    for (i, page) in fw_pages.iter().enumerate() {
+fn write_flash(conn: &mut PicobootConnection<Context>, data: &[u8], offset: usize) {
+    for (i, page) in bin_pages(data).iter().enumerate() {
         if i.is_multiple_of(10) {
             print!(".");
         }
@@ -134,10 +137,11 @@ fn flash_bytes_at_offset(conn: &mut PicobootConnection<Context>, data: &[u8], of
         let read = conn
             .flash_read(addr, PICO_PAGE_SIZE)
             .expect("failed to read flash");
-        let matching = page.iter().zip(&read).all(|(&a, &b)| a == b);
-        assert!(matching, "page does not match flash");
+        assert!(
+            page.iter().zip(&read).all(|(&a, &b)| a == b),
+            "page does not match flash"
+        );
     }
-    println!();
 }
 
 fn bin_pages(fw: &[u8]) -> Vec<Vec<u8>> {

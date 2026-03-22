@@ -2,11 +2,11 @@ use crate::flash::WriteConfig;
 use clap::Parser;
 use miette::{Result, miette};
 
+pub mod buffer_nor_flash;
 pub mod cli;
 pub mod config;
 pub mod elf;
 pub mod flash;
-pub mod picoboot_nor_flash;
 
 fn main() -> Result<()> {
     // TODO: use this once -Z bindeps stabilizes
