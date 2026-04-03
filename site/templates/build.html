@@ -102,8 +102,7 @@ DPedal Build Instructions
 </p>
 
 <p>
-  For the majority of parts, you can choose to print them at home or use a printing service like JLC.
-  However, some parts will need to be printed by a service in high-strength + high-accuracy resin or nylon.
+  You can choose to print these parts at home or via a printing service like JLC.
 </p>
 
 
@@ -139,20 +138,22 @@ DPedal Build Instructions
     <td>Home FDM or order from JLC</td>
   </tr>
   <tr>
-    <td>Button Keycap</td>
+    <td>Keycap</td>
     <td>2</td>
-    <td>Order from JLC (The pins will break if printed using FDM printers)</td>
+    <td>Recommended to order a resin print from JLC, as most home FDM filaments will produce brittle pins that snap off.
+      However, there is a separate STL file optimized for FDM printing if you want to try.
+    </td>
   </tr>
   <tr>
     <td>Dpad</td>
     <td>1</td>
-    <td>Order from JLC to ensure it matches the keycaps or otherwise just print at home.</td>
+    <td>Recommended to match "Button Keycap" method for aesthetic purposes.</td>
   </tr>
 </table>
 
-<img class="build-img" src="/media/all_parts.webp">
+<img class="build-img" src="/media/printed_parts.webp">
 
-<p>To order:</p>
+<h2>Ordering Printed Parts</h2>
 <ol>
   <li>Download the STLs <a
       href="https://github.com/rukai/DPedal/releases/latest/download/dpedal_3d_printed_parts.zip">here</a>, and extract
@@ -165,14 +166,14 @@ DPedal Build Instructions
     <ul>
       <li>The following are known to be suitable for the button keycaps + dpad</li>
       <ul>
-        <li>SLA(Resin) -> LEDO6060 Resign (White)</li>
         <li>SLA(Resin) -> Black Resin</li>
       </ul>
+      <!-- TODO: try this out and report back
       <li>The following are known to be suitable for everything else</li>
       <ul>
-        <li>SLA(Resin) -> LEDO6060 Resign (White)</li>
         <li>SLA(Resin) -> Black Resin</li>
       </ul>
+      -->
     </ul>
     <li>Set "Qty" as per above table</li>
     <li>Set "Product Desc" to:</li>
@@ -182,10 +183,11 @@ DPedal Build Instructions
     </ul>
     <li>Save to cart</li>
   </ol>
-  <li>Go to next section before completing the order</li>
+  <li>Complete the next section about ordering the PCB before completing the order. This will save on shipping cost by
+    shipping the PCB and printed parts together.</li>
 </ol>
 
-<h2 id="orderpcb">The PCB</h2>
+<h2 id="orderpcb">Ordering the PCB</h2>
 
 <p>DPedal uses a custom PCB which must be ordered from a PCB manufacturer.</p>
 
@@ -250,8 +252,7 @@ DPedal Build Instructions
   <li>Connect soldering jig into the Pico via the through holes and pins</li>
   <img class="build-img" loading="lazy" src="/media/pico_jig2.webp">
   <li>Connect Pico to the PCB via the jig, it may need to be pushed until clicking into place. The Pico should sit
-    secure and flatly on the PCB. Make sure the orientation matches the image, the "DPedal V3" text should NOT be
-    visible on the PCB.</li>
+    secure and flatly on the PCB. Make sure the orientation matches the image.</li>
   <ul>
     <li>NOTE: If the Pico is not sitting flat against the PCB, some masking tape can be used to secure it.</li>
   </ul>
