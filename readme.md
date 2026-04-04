@@ -7,7 +7,7 @@ You can build your own from this design if you are comfortable with 3d printing,
 
 To build your own dpedal follow [the instructions here](https://dpedal.com/build.html).
 
-![Image of the dpedal](https://dpedal.com/media/dpedal_transparent.webp)
+![Image of the dpedal](https://dpedal.com/media/hero.webp)
 
 This repo contains the source for:
 
