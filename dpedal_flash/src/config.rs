@@ -328,3 +328,122 @@ pub enum DeviceKdl {
     #[default]
     DpedalV3,
 }
+
+#[cfg(test)]
+mod test {
+    use std::path::PathBuf;
+
+    use dpedal_config::{
+        ComputerInput, Config, DpedalInput, KeyboardInput, MappingMode, Meta, MouseInput,
+    };
+    use dpedal_config::{Device, Mapping, PinRemapping, Profile};
+    use miette::{GraphicalReportHandler, GraphicalTheme};
+
+    use crate::config::load;
+
+    #[test]
+    fn test_example_config_loads() {
+        load(None).unwrap();
+    }
+
+    fn fmt_report(diag: miette::Error) -> String {
+        let mut out = String::new();
+        GraphicalReportHandler::new_themed(GraphicalTheme::unicode_nocolor())
+            .without_syntax_highlighting()
+            .with_width(80)
+            .render_report(&mut out, diag.as_ref())
+            .unwrap();
+        out
+    }
+
+    #[test]
+    fn test_parse_config_bad_nickname() {
+        let err = load(Some(PathBuf::from("src/test-configs/bad-nickname.kdl"))).unwrap_err();
+        let expected = r#"
+  × Failed to parse configuration
+
+Error: 
+  × Expected type String but was Integer
+   ╭─[bad-nickname.kdl:3:1]
+ 2 │ device dpedal-v3
+ 3 │ nickname 5
+   · ─────┬────
+   ·      ╰── here
+ 4 │ color 0xFF0000
+   ╰────
+"#;
+        pretty_assertions::assert_eq!(fmt_report(err).trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_parse_config_success() {
+        let config = load(Some(PathBuf::from("src/test-configs/config.kdl"))).unwrap();
+        assert_eq!(
+            config,
+            Config {
+                meta: Meta {
+                    version: 0,
+                    nickname: heapless::String::try_from("My DPedal").unwrap(),
+                    device: Device::DpedalV3,
+                    color: 0xFF0000,
+                    pin_remappings: heapless::Vec::from_iter([
+                        PinRemapping {
+                            input: DpedalInput::ButtonLeft,
+                            pin: 3
+                        },
+                        PinRemapping {
+                            input: DpedalInput::ButtonRight,
+                            pin: 20
+                        }
+                    ])
+                },
+                profiles: heapless::Vec::from_iter([Profile {
+                    mappings: heapless::Vec::from_iter([
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([DpedalInput::DpadUp]),
+                            mode: MappingMode::OnPress,
+                            output_sequence: heapless::Vec::from_iter([ComputerInput::Mouse(
+                                MouseInput::ScrollUp(20),
+                            )]),
+                        },
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([DpedalInput::DpadDown]),
+                            mode: MappingMode::OnPress,
+                            output_sequence: heapless::Vec::from_iter([ComputerInput::Mouse(
+                                MouseInput::ScrollDown(20),
+                            )]),
+                        },
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([DpedalInput::DpadLeft]),
+                            mode: MappingMode::OnPress,
+                            output_sequence: heapless::Vec::from_iter([ComputerInput::Mouse(
+                                MouseInput::ScrollLeft(20),
+                            )]),
+                        },
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([DpedalInput::DpadRight]),
+                            mode: MappingMode::OnPress,
+                            output_sequence: heapless::Vec::from_iter([ComputerInput::Mouse(
+                                MouseInput::ScrollRight(20),
+                            )]),
+                        },
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([DpedalInput::ButtonLeft]),
+                            mode: MappingMode::OnPress,
+                            output_sequence: heapless::Vec::from_iter([ComputerInput::Keyboard(
+                                KeyboardInput::PageUp,
+                            )]),
+                        },
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([DpedalInput::ButtonRight]),
+                            mode: MappingMode::OnPress,
+                            output_sequence: heapless::Vec::from_iter([ComputerInput::Keyboard(
+                                KeyboardInput::PageDown,
+                            )]),
+                        },
+                    ]),
+                }]),
+            }
+        );
+    }
+}

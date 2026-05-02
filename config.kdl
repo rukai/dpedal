@@ -21,12 +21,6 @@ profiles {
           - "dpad-right -> mouse-scroll-right"
           - "button-left -> keyboard-page-up"
           - "button-right -> keyboard-page-down"
-
-          // TODO:
-          // - button-left+button_right+dpad_down -> enter-flash-mode
-          // - button-left+button_right -> go-to-profile 2
-          // and allow:
-          // - dpad-right -> mouse-scroll-right 5 + sleep 5s + mouse-scroll-right 5
         }
     }
     // Alternate profile
@@ -38,10 +32,6 @@ profiles {
 
     //     button-left keyboard-page-up
     //     button-right keyboard-page-down
-
-    //     // TODO:
-    //     // button-left+button_right+dpad_down enter-flash-mode
-    //     // button-left+button_right go-to-profile 1
     // }
 }
 
