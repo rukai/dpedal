@@ -880,7 +880,7 @@ dependencies = [
 [[package]]
 name = "kdl_config"
 version = "0.1.0"
-source = "git+https://github.com/rukai/kdl_config#8809bb33af3782ae9487c2e226fb948ab3cc436a"
+source = "git+https://github.com/rukai/kdl_config#f29736e25f4b86cc55469e73c26e20fa73bcb29b"
 dependencies = [
  "arrayvec",
  "heapless 0.8.0",
@@ -892,7 +892,7 @@ dependencies = [
 [[package]]
 name = "kdl_config_derive"
 version = "0.1.0"
-source = "git+https://github.com/rukai/kdl_config#8809bb33af3782ae9487c2e226fb948ab3cc436a"
+source = "git+https://github.com/rukai/kdl_config#f29736e25f4b86cc55469e73c26e20fa73bcb29b"
 dependencies = [
  "proc-macro2",
  "quote",

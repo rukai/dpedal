@@ -1,0 +1,19 @@
+version 0
+device dpedal-v3
+nickname "My DPedal"
+color 0xFF0000
+profiles {
+    - {
+        mappings {
+          - on-pressa : dpad-up -> mouse-scroll-up 20
+          - on-press : dpad-down + -> mouse-scroll-down 20
+          - on-press : dpad-left mouse-scroll-left 20
+          - on-press : dpad-right -> mouse-scroll-right
+          - on-press : dpad-diagonal -> keyboard-a
+          - on-press dpad-diagonal -> keyboard-a
+          - on-press :
+        }
+    }
+}
+
+pin-remappings { }

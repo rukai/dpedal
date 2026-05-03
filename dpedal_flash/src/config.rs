@@ -1,7 +1,7 @@
 use dpedal_config::{
-    ComputerInput, Config, DpedalInput, KeyboardInput, MAX_COMPUTER_INPUTS, MAX_DPEDAL_INPUTS,
-    MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES, MappingMode, Meta,
-    MouseInput,
+    ComputerInput, Config, DPedalControl, DpedalInput, KeyboardInput, MAX_COMPUTER_INPUTS,
+    MAX_DPEDAL_INPUTS, MAX_MAPPINGS, MAX_NICKNAME_LEN, MAX_PIN_REMAPPINGS, MAX_PROFILES,
+    MappingMode, Meta, MouseInput,
 };
 use kdl::{KdlDocument, KdlNode};
 use kdl_config::{
@@ -120,65 +120,185 @@ impl KdlConfig for MappingKdl {
         Self: Sized,
     {
         let entries = node.entries();
+        let span = node.span();
 
-        let (Some(input_entry), Some(arrow_entry), Some(output_entry)) =
-            (entries.first(), entries.get(1), entries.get(2))
-        else {
+        // Find the ":" separator between mode and inputs
+        let Some(colon_idx) = entries.iter().position(|e| is_token(e, ":")) else {
             diagnostics.push(
-                ParseDiagnostic::new(source.clone(), node.span())
-                    .message("Mapping needs to follow format `input -> output`"),
+                ParseDiagnostic::new(source.clone(), span)
+                    .message("Mapping needs format `mode : inputs -> outputs`"),
             );
-            return Parsed {
-                value: Default::default(),
-                full_span: node.span(),
-                name_span: node.span(),
-                valid: false,
-            };
+            return Parsed::invalid(span);
         };
 
-        match arrow_entry.value() {
-            kdl::KdlValue::String(value) if value == "->" => {}
-            value => {
+        // Find the "->" separator between inputs and outputs (must come after ":")
+        let after_colon = &entries[colon_idx + 1..];
+        let after_colon_span = match (after_colon.first(), after_colon.last()) {
+            (Some(first), Some(last)) => {
+                let start = first.span().offset();
+                let end = last.span().offset() + last.span().len();
+                miette::SourceSpan::new(start.into(), end - start)
+            }
+            _ => span,
+        };
+        let Some(arrow_offset) = after_colon.iter().position(|e| is_token(e, "->")) else {
+            diagnostics.push(
+                ParseDiagnostic::new(source.clone(), after_colon_span)
+                    .message("Mapping needs `->` separator between inputs and outputs"),
+            );
+            return Parsed::invalid(span);
+        };
+        let arrow_idx = colon_idx + 1 + arrow_offset;
+
+        let mode_entries = &entries[..colon_idx];
+        let input_entries = &entries[colon_idx + 1..arrow_idx];
+        let output_entries = &entries[arrow_idx + 1..];
+
+        let Some(mode) = parse_mode(source.clone(), mode_entries, span, diagnostics) else {
+            return Parsed::invalid(span);
+        };
+
+        // Parse inputs separated by "+"
+        let mut input_set = heapless::Vec::new();
+        for group in split_by_plus(input_entries) {
+            let Some(entry) = group.first() else {
                 diagnostics.push(
-                    ParseDiagnostic::new(source.clone(), node.span())
-                        .message(format!("Expected `->` but got {value:?}")),
+                    ParseDiagnostic::new(source.clone(), span)
+                        .message("Empty input group, check for duplicate or leading/trailing `+`"),
                 );
-                return Parsed {
-                    value: Default::default(),
-                    full_span: node.span(),
-                    name_span: node.span(),
-                    valid: false,
-                };
+                return Parsed::invalid(span);
+            };
+            match parse_dpedal_input(source.clone(), entry, diagnostics) {
+                Some(input) => {
+                    if input_set.push(input).is_err() {
+                        diagnostics.push(
+                            ParseDiagnostic::new(source.clone(), span)
+                                .message(format!("Too many inputs, max is {MAX_DPEDAL_INPUTS}")),
+                        );
+                        return Parsed::invalid(span);
+                    }
+                }
+                None => return Parsed::invalid(span),
             }
         }
 
-        let Some(input) = parse_dpedal_input(source.clone(), input_entry, diagnostics) else {
-            return Parsed {
-                value: Default::default(),
-                full_span: node.span(),
-                name_span: node.span(),
-                valid: false,
-            };
-        };
-
-        let Some(output) = parse_computer_input(source, output_entry, diagnostics) else {
-            return Parsed {
-                value: Default::default(),
-                full_span: node.span(),
-                name_span: node.span(),
-                valid: false,
-            };
-        };
+        // Parse outputs separated by "+"
+        let mut output_sequence = heapless::Vec::new();
+        for group in split_by_plus(output_entries) {
+            if group.is_empty() {
+                diagnostics
+                    .push(ParseDiagnostic::new(source.clone(), span).message(
+                        "Empty output group, check for duplicate or leading/trailing `+`",
+                    ));
+                return Parsed::invalid(span);
+            }
+            match parse_computer_input(source.clone(), group, diagnostics) {
+                Some(output) => {
+                    if output_sequence.push(output).is_err() {
+                        diagnostics
+                            .push(ParseDiagnostic::new(source.clone(), span).message(format!(
+                                "Too many outputs, max is {MAX_COMPUTER_INPUTS}"
+                            )));
+                        return Parsed::invalid(span);
+                    }
+                }
+                None => return Parsed::invalid(span),
+            }
+        }
 
         Parsed {
             value: MappingKdl {
-                input_set: heapless::Vec::from_slice(&[input]).unwrap(),
-                mode: MappingMode::OnPress,
-                output_sequence: heapless::Vec::from_slice(&[output]).unwrap(),
+                input_set,
+                mode,
+                output_sequence,
             },
-            full_span: node.span(),
-            name_span: node.span(),
+            full_span: span,
+            name_span: span,
             valid: true,
+        }
+    }
+}
+
+fn is_token(entry: &kdl::KdlEntry, token: &str) -> bool {
+    matches!(entry.value(), kdl::KdlValue::String(s) if s == token)
+}
+
+/// Split a slice of KDL entries into groups at each "+" token entry.
+fn split_by_plus(entries: &[kdl::KdlEntry]) -> Vec<&[kdl::KdlEntry]> {
+    let mut groups = vec![];
+    let mut start = 0;
+    for (i, entry) in entries.iter().enumerate() {
+        if is_token(entry, "+") {
+            groups.push(&entries[start..i]);
+            start = i + 1;
+        }
+    }
+    groups.push(&entries[start..]);
+    groups
+}
+
+// bit silly, but the enum parsing logic shared with the web app expects the integer as a string,
+// maybe we can clean this up later
+fn entry_integer_as_string(entry: &kdl::KdlEntry) -> Option<String> {
+    match entry.value() {
+        kdl::KdlValue::Integer(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
+fn kebab_to_pascal_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut upper = true;
+    for char in s.chars() {
+        if upper {
+            result.push(char.to_ascii_uppercase());
+            upper = false;
+        } else if char == '-' {
+            upper = true;
+        } else {
+            result.push(char);
+        }
+    }
+    result
+}
+
+fn parse_mode(
+    source: NamedSource<String>,
+    entries: &[kdl::KdlEntry],
+    span: miette::SourceSpan,
+    diagnostics: &mut Vec<ParseDiagnostic>,
+) -> Option<MappingMode> {
+    let Some(name_entry) = entries.first() else {
+        diagnostics
+            .push(ParseDiagnostic::new(source, span).message("Mapping is missing mode before `:`"));
+        return None;
+    };
+
+    let name = match name_entry.value() {
+        kdl::KdlValue::String(s) => s.as_str(),
+        value => {
+            diagnostics.push(
+                ParseDiagnostic::new(source, name_entry.span())
+                    .message(format!("Expected mode string but got {value:?}")),
+            );
+            return None;
+        }
+    };
+
+    let num_str = entries
+        .get(1)
+        .and_then(entry_integer_as_string)
+        .unwrap_or_default();
+
+    let pascal = kebab_to_pascal_case(name);
+    match MappingMode::from_string(&pascal, &num_str) {
+        Some(mode) => Some(mode),
+        None => {
+            diagnostics.push(
+                ParseDiagnostic::new(source, name_entry.span())
+                    .message(format!("Unknown mode {name:?}")),
+            );
+            None
         }
     }
 }
@@ -212,71 +332,66 @@ fn parse_dpedal_input(
 
 fn parse_computer_input(
     source: NamedSource<String>,
-    entry: &kdl::KdlEntry,
+    entries: &[kdl::KdlEntry],
     diagnostics: &mut Vec<ParseDiagnostic>,
 ) -> Option<ComputerInput> {
-    let value = match entry.value() {
-        kdl::KdlValue::String(value) => value.as_str(),
+    let name_entry = entries.first().expect("caller ensures non-empty");
+
+    let name = match name_entry.value() {
+        kdl::KdlValue::String(s) => s.as_str(),
         value => {
             diagnostics.push(
-                ParseDiagnostic::new(source, entry.span())
+                ParseDiagnostic::new(source, name_entry.span())
                     .message(format!("Expected a string but got {value:?}")),
             );
             return None;
         }
     };
-    let Some((ty, sub_ty)) = value.split_once('-') else {
-        diagnostics.push(
-            ParseDiagnostic::new(source, entry.span()).message(format!("Unknown output {value:?}")),
-        );
-        return None;
-    };
-    match ty {
-        "mouse" => match MouseInput::from_string(sub_ty, "20") {
+
+    let num_str = entries
+        .get(1)
+        .and_then(entry_integer_as_string)
+        .unwrap_or_default();
+
+    if let Some(rest) = name.strip_prefix("mouse-") {
+        match MouseInput::from_string(rest, &num_str) {
             Some(input) => Some(ComputerInput::Mouse(input)),
             None => {
                 diagnostics.push(
-                    ParseDiagnostic::new(source, entry.span())
-                        .message(format!("Unknown output {value:?}")),
+                    ParseDiagnostic::new(source, name_entry.span())
+                        .message(format!("Unknown mouse output {name:?}")),
                 );
                 None
             }
-        },
-        "keyboard" => match keyboard_from_string_kebab(sub_ty) {
+        }
+    } else if let Some(rest) = name.strip_prefix("keyboard-") {
+        match keyboard_from_string_kebab(rest) {
             Some(input) => Some(ComputerInput::Keyboard(input)),
             None => {
                 diagnostics.push(
-                    ParseDiagnostic::new(source, entry.span())
-                        .message(format!("Unknown output {value:?}")),
+                    ParseDiagnostic::new(source, name_entry.span())
+                        .message(format!("Unknown keyboard output {name:?}")),
                 );
                 None
             }
-        },
-        _ => {
-            diagnostics.push(
-                ParseDiagnostic::new(source, entry.span())
-                    .message(format!("Unknown output {value:?}")),
-            );
-            None
+        }
+    } else {
+        let pascal = kebab_to_pascal_case(name);
+        match DPedalControl::from_string(&pascal, &num_str) {
+            Some(ctrl) => Some(ComputerInput::Control(ctrl)),
+            None => {
+                diagnostics.push(
+                    ParseDiagnostic::new(source, name_entry.span())
+                        .message(format!("Unknown output {name:?}")),
+                );
+                None
+            }
         }
     }
 }
 
 pub fn keyboard_from_string_kebab(s: &str) -> Option<KeyboardInput> {
-    let mut pascal_case = String::new();
-
-    let mut upper = true;
-    for char in s.chars() {
-        if upper {
-            pascal_case.push(char.to_ascii_uppercase());
-            upper = false;
-        } else if char == '-' {
-            upper = true;
-        } else {
-            pascal_case.push(char);
-        }
-    }
-    KeyboardInput::from_str(&pascal_case).ok()
+    KeyboardInput::from_str(&kebab_to_pascal_case(s)).ok()
 }
 
 #[test]
@@ -350,6 +465,85 @@ Error:
    ·      ╰── here
  4 │ color 0xFF0000
    ╰────
+"#;
+        pretty_assertions::assert_eq!(fmt_report(err).trim(), expected.trim());
+    }
+
+    #[test]
+    fn test_parse_config_bad_mappings() {
+        let err = load(Some(PathBuf::from("src/test-configs/bad-mappings.kdl"))).unwrap_err();
+        let expected = r#"
+  × Failed to parse configuration
+
+Error: 
+  × Unknown mode "on-pressa"
+   ╭─[bad-mappings.kdl:8:13]
+ 7 │         mappings {
+ 8 │           - on-pressa : dpad-up -> mouse-scroll-up 20
+   ·             ────┬────
+   ·                 ╰── here
+ 9 │           - on-press : dpad-down + -> mouse-scroll-down 20
+   ╰────
+
+Error: 
+  × Empty input group, check for duplicate or leading/trailing `+`
+    ╭─[bad-mappings.kdl:9:11]
+  8 │           - on-pressa : dpad-up -> mouse-scroll-up 20
+  9 │           - on-press : dpad-down + -> mouse-scroll-down 20
+    ·           ────────────────────────┬───────────────────────
+    ·                                   ╰── here
+ 10 │           - on-press : dpad-left mouse-scroll-left 20
+    ╰────
+
+Error: 
+  × Mapping needs `->` separator between inputs and outputs
+    ╭─[bad-mappings.kdl:10:24]
+  9 │           - on-press : dpad-down + -> mouse-scroll-down 20
+ 10 │           - on-press : dpad-left mouse-scroll-left 20
+    ·                        ───────────────┬──────────────
+    ·                                       ╰── here
+ 11 │           - on-press : dpad-right -> mouse-scroll-right
+    ╰────
+
+Error: 
+  × Unknown mouse output "mouse-scroll-right"
+    ╭─[bad-mappings.kdl:11:38]
+ 10 │           - on-press : dpad-left mouse-scroll-left 20
+ 11 │           - on-press : dpad-right -> mouse-scroll-right
+    ·                                      ─────────┬────────
+    ·                                               ╰── here
+ 12 │           - on-press : dpad-diagonal -> keyboard-a
+    ╰────
+
+Error: 
+  × Unknown input "dpad-diagonal"
+    ╭─[bad-mappings.kdl:12:24]
+ 11 │           - on-press : dpad-right -> mouse-scroll-right
+ 12 │           - on-press : dpad-diagonal -> keyboard-a
+    ·                        ──────┬──────
+    ·                              ╰── here
+ 13 │           - on-press dpad-diagonal -> keyboard-a
+    ╰────
+
+Error: 
+  × Mapping needs format `mode : inputs -> outputs`
+    ╭─[bad-mappings.kdl:13:11]
+ 12 │           - on-press : dpad-diagonal -> keyboard-a
+ 13 │           - on-press dpad-diagonal -> keyboard-a
+    ·           ───────────────────┬──────────────────
+    ·                              ╰── here
+ 14 │           - on-press :
+    ╰────
+
+Error: 
+  × Mapping needs `->` separator between inputs and outputs
+    ╭─[bad-mappings.kdl:14:11]
+ 13 │           - on-press dpad-diagonal -> keyboard-a
+ 14 │           - on-press :
+    ·           ──────┬─────
+    ·                 ╰── here
+ 15 │         }
+    ╰────
 "#;
         pretty_assertions::assert_eq!(fmt_report(err).trim(), expected.trim());
     }
