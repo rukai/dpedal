@@ -119,9 +119,14 @@ impl KdlConfig for MappingKdl {
     where
         Self: Sized,
     {
-        let Some(entry) = node.entries().first() else {
+        let entries = node.entries();
+
+        let (Some(input_entry), Some(arrow_entry), Some(output_entry)) =
+            (entries.first(), entries.get(1), entries.get(2))
+        else {
             diagnostics.push(
-                ParseDiagnostic::new(source.clone(), node.span()).message("Unexpected format"),
+                ParseDiagnostic::new(source.clone(), node.span())
+                    .message("Mapping needs to follow format `input -> output`"),
             );
             return Parsed {
                 value: Default::default(),
@@ -130,117 +135,129 @@ impl KdlConfig for MappingKdl {
                 valid: false,
             };
         };
-        match entry.value() {
-            kdl::KdlValue::String(value) => {
-                let mut split = value.split("->");
-                let input = split.next().unwrap().trim();
-                let Some(output) = split.next() else {
-                    diagnostics.push(ParseDiagnostic::new(source.clone(), node.span()).message(
-                        "Mapping needs to follow format `input -> output` but `->` was not present",
-                    ));
-                    return Parsed {
-                        value: Default::default(),
-                        full_span: node.span(),
-                        name_span: node.span(),
-                        valid: false,
-                    };
-                };
-                let output = output.trim();
 
-                let Some(input) = DpedalInput::from_string_kebab(input) else {
-                    diagnostics.push(
-                        ParseDiagnostic::new(source.clone(), node.span())
-                            .message(format!("Unknown input {input:?}")),
-                    );
-                    return Parsed {
-                        value: Default::default(),
-                        full_span: node.span(),
-                        name_span: node.span(),
-                        valid: false,
-                    };
-                };
-                let input = heapless::Vec::from_slice(&[input]).unwrap();
-
-                let Some((ty, sub_ty)) = output.split_once("-") else {
-                    diagnostics.push(
-                        ParseDiagnostic::new(source.clone(), node.span())
-                            .message(format!("Unknown output {output:?}")),
-                    );
-                    return Parsed {
-                        value: Default::default(),
-                        full_span: node.span(),
-                        name_span: node.span(),
-                        valid: false,
-                    };
-                };
-
-                let output = match ty {
-                    "mouse" => match MouseInput::from_string(sub_ty, "20") {
-                        Some(input) => ComputerInput::Mouse(input),
-                        None => {
-                            diagnostics.push(
-                                ParseDiagnostic::new(source.clone(), node.span())
-                                    .message(format!("Unknown output {output:?}")),
-                            );
-                            return Parsed {
-                                value: Default::default(),
-                                full_span: node.span(),
-                                name_span: node.span(),
-                                valid: false,
-                            };
-                        }
-                    },
-                    "keyboard" => match keyboard_from_string_kebab(sub_ty) {
-                        Some(input) => ComputerInput::Keyboard(input),
-                        None => {
-                            diagnostics.push(
-                                ParseDiagnostic::new(source.clone(), node.span())
-                                    .message(format!("Unknown output {output:?}")),
-                            );
-                            return Parsed {
-                                value: Default::default(),
-                                full_span: node.span(),
-                                name_span: node.span(),
-                                valid: false,
-                            };
-                        }
-                    },
-                    _ => {
-                        diagnostics.push(
-                            ParseDiagnostic::new(source.clone(), node.span())
-                                .message(format!("Unknown output {output:?}")),
-                        );
-                        return Parsed {
-                            value: Default::default(),
-                            full_span: node.span(),
-                            name_span: node.span(),
-                            valid: false,
-                        };
-                    }
-                };
-                let output_sequence = heapless::Vec::from_slice(&[output]).unwrap();
-                Parsed {
-                    value: MappingKdl {
-                        input_set: input,
-                        mode: MappingMode::OnPress,
-                        output_sequence,
-                    },
-                    full_span: node.span(),
-                    name_span: node.span(),
-                    valid: true,
-                }
-            }
+        match arrow_entry.value() {
+            kdl::KdlValue::String(value) if value == "->" => {}
             value => {
-                diagnostics.push(ParseDiagnostic::new(source.clone(), node.span()).message(
-                    format!("Node contains {value:?} but expected it to contain a string"),
-                ));
-                Parsed {
+                diagnostics.push(
+                    ParseDiagnostic::new(source.clone(), node.span())
+                        .message(format!("Expected `->` but got {value:?}")),
+                );
+                return Parsed {
                     value: Default::default(),
                     full_span: node.span(),
                     name_span: node.span(),
                     valid: false,
-                }
+                };
             }
+        }
+
+        let Some(input) = parse_dpedal_input(source.clone(), input_entry, diagnostics) else {
+            return Parsed {
+                value: Default::default(),
+                full_span: node.span(),
+                name_span: node.span(),
+                valid: false,
+            };
+        };
+
+        let Some(output) = parse_computer_input(source, output_entry, diagnostics) else {
+            return Parsed {
+                value: Default::default(),
+                full_span: node.span(),
+                name_span: node.span(),
+                valid: false,
+            };
+        };
+
+        Parsed {
+            value: MappingKdl {
+                input_set: heapless::Vec::from_slice(&[input]).unwrap(),
+                mode: MappingMode::OnPress,
+                output_sequence: heapless::Vec::from_slice(&[output]).unwrap(),
+            },
+            full_span: node.span(),
+            name_span: node.span(),
+            valid: true,
+        }
+    }
+}
+
+fn parse_dpedal_input(
+    source: NamedSource<String>,
+    entry: &kdl::KdlEntry,
+    diagnostics: &mut Vec<ParseDiagnostic>,
+) -> Option<DpedalInput> {
+    let value = match entry.value() {
+        kdl::KdlValue::String(value) => value.as_str(),
+        value => {
+            diagnostics.push(
+                ParseDiagnostic::new(source, entry.span())
+                    .message(format!("Expected a string but got {value:?}")),
+            );
+            return None;
+        }
+    };
+    match DpedalInput::from_string_kebab(value) {
+        Some(input) => Some(input),
+        None => {
+            diagnostics.push(
+                ParseDiagnostic::new(source, entry.span())
+                    .message(format!("Unknown input {value:?}")),
+            );
+            None
+        }
+    }
+}
+
+fn parse_computer_input(
+    source: NamedSource<String>,
+    entry: &kdl::KdlEntry,
+    diagnostics: &mut Vec<ParseDiagnostic>,
+) -> Option<ComputerInput> {
+    let value = match entry.value() {
+        kdl::KdlValue::String(value) => value.as_str(),
+        value => {
+            diagnostics.push(
+                ParseDiagnostic::new(source, entry.span())
+                    .message(format!("Expected a string but got {value:?}")),
+            );
+            return None;
+        }
+    };
+    let Some((ty, sub_ty)) = value.split_once('-') else {
+        diagnostics.push(
+            ParseDiagnostic::new(source, entry.span()).message(format!("Unknown output {value:?}")),
+        );
+        return None;
+    };
+    match ty {
+        "mouse" => match MouseInput::from_string(sub_ty, "20") {
+            Some(input) => Some(ComputerInput::Mouse(input)),
+            None => {
+                diagnostics.push(
+                    ParseDiagnostic::new(source, entry.span())
+                        .message(format!("Unknown output {value:?}")),
+                );
+                None
+            }
+        },
+        "keyboard" => match keyboard_from_string_kebab(sub_ty) {
+            Some(input) => Some(ComputerInput::Keyboard(input)),
+            None => {
+                diagnostics.push(
+                    ParseDiagnostic::new(source, entry.span())
+                        .message(format!("Unknown output {value:?}")),
+                );
+                None
+            }
+        },
+        _ => {
+            diagnostics.push(
+                ParseDiagnostic::new(source, entry.span())
+                    .message(format!("Unknown output {value:?}")),
+            );
+            None
         }
     }
 }
