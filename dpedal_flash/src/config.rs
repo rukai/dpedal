@@ -120,14 +120,9 @@ impl KdlConfig for MappingKdl {
         Self: Sized,
     {
         let Some(entry) = node.entries().first() else {
-            diagnostics.push(ParseDiagnostic {
-                input: source.clone(),
-                span: node.span(),
-                message: Some("Unexpected format".to_owned()),
-                label: None,
-                help: None,
-                severity: miette::Severity::Error,
-            });
+            diagnostics.push(
+                ParseDiagnostic::new(source.clone(), node.span()).message("Unexpected format"),
+            );
             return Parsed {
                 value: Default::default(),
                 full_span: node.span(),
@@ -140,16 +135,9 @@ impl KdlConfig for MappingKdl {
                 let mut split = value.split("->");
                 let input = split.next().unwrap().trim();
                 let Some(output) = split.next() else {
-                    diagnostics.push(ParseDiagnostic {
-                        input: source.clone(),
-                        span: node.span(),
-                        message: Some(
-                            "Mapping needs to follow format `input -> output` but `->` was not present".to_owned()
-                        ),
-                        label: None,
-                        help: None,
-                        severity: miette::Severity::Error,
-                    });
+                    diagnostics.push(ParseDiagnostic::new(source.clone(), node.span()).message(
+                        "Mapping needs to follow format `input -> output` but `->` was not present",
+                    ));
                     return Parsed {
                         value: Default::default(),
                         full_span: node.span(),
@@ -160,14 +148,10 @@ impl KdlConfig for MappingKdl {
                 let output = output.trim();
 
                 let Some(input) = DpedalInput::from_string_kebab(input) else {
-                    diagnostics.push(ParseDiagnostic {
-                        input: source.clone(),
-                        span: node.span(),
-                        message: Some(format!("Unknown input {input:?}")),
-                        label: None,
-                        help: None,
-                        severity: miette::Severity::Error,
-                    });
+                    diagnostics.push(
+                        ParseDiagnostic::new(source.clone(), node.span())
+                            .message(format!("Unknown input {input:?}")),
+                    );
                     return Parsed {
                         value: Default::default(),
                         full_span: node.span(),
@@ -178,14 +162,10 @@ impl KdlConfig for MappingKdl {
                 let input = heapless::Vec::from_slice(&[input]).unwrap();
 
                 let Some((ty, sub_ty)) = output.split_once("-") else {
-                    diagnostics.push(ParseDiagnostic {
-                        input: source.clone(),
-                        span: node.span(),
-                        message: Some(format!("Unknown output {output:?}")),
-                        label: None,
-                        help: None,
-                        severity: miette::Severity::Error,
-                    });
+                    diagnostics.push(
+                        ParseDiagnostic::new(source.clone(), node.span())
+                            .message(format!("Unknown output {output:?}")),
+                    );
                     return Parsed {
                         value: Default::default(),
                         full_span: node.span(),
@@ -198,14 +178,10 @@ impl KdlConfig for MappingKdl {
                     "mouse" => match MouseInput::from_string(sub_ty, "20") {
                         Some(input) => ComputerInput::Mouse(input),
                         None => {
-                            diagnostics.push(ParseDiagnostic {
-                                input: source.clone(),
-                                span: node.span(),
-                                message: Some(format!("Unknown output {output:?}")),
-                                label: None,
-                                help: None,
-                                severity: miette::Severity::Error,
-                            });
+                            diagnostics.push(
+                                ParseDiagnostic::new(source.clone(), node.span())
+                                    .message(format!("Unknown output {output:?}")),
+                            );
                             return Parsed {
                                 value: Default::default(),
                                 full_span: node.span(),
@@ -217,14 +193,10 @@ impl KdlConfig for MappingKdl {
                     "keyboard" => match keyboard_from_string_kebab(sub_ty) {
                         Some(input) => ComputerInput::Keyboard(input),
                         None => {
-                            diagnostics.push(ParseDiagnostic {
-                                input: source.clone(),
-                                span: node.span(),
-                                message: Some(format!("Unknown output {output:?}")),
-                                label: None,
-                                help: None,
-                                severity: miette::Severity::Error,
-                            });
+                            diagnostics.push(
+                                ParseDiagnostic::new(source.clone(), node.span())
+                                    .message(format!("Unknown output {output:?}")),
+                            );
                             return Parsed {
                                 value: Default::default(),
                                 full_span: node.span(),
@@ -234,14 +206,10 @@ impl KdlConfig for MappingKdl {
                         }
                     },
                     _ => {
-                        diagnostics.push(ParseDiagnostic {
-                            input: source.clone(),
-                            span: node.span(),
-                            message: Some(format!("Unknown output {output:?}")),
-                            label: None,
-                            help: None,
-                            severity: miette::Severity::Error,
-                        });
+                        diagnostics.push(
+                            ParseDiagnostic::new(source.clone(), node.span())
+                                .message(format!("Unknown output {output:?}")),
+                        );
                         return Parsed {
                             value: Default::default(),
                             full_span: node.span(),
@@ -263,16 +231,9 @@ impl KdlConfig for MappingKdl {
                 }
             }
             value => {
-                diagnostics.push(ParseDiagnostic {
-                    input: source.clone(),
-                    span: node.span(),
-                    message: Some(format!(
-                        "Node contains {value:?} but expected it to contain a string"
-                    )),
-                    label: None,
-                    help: None,
-                    severity: miette::Severity::Error,
-                });
+                diagnostics.push(ParseDiagnostic::new(source.clone(), node.span()).message(
+                    format!("Node contains {value:?} but expected it to contain a string"),
+                ));
                 Parsed {
                     value: Default::default(),
                     full_span: node.span(),
