@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "dpedal_flash"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "clap",
  "dpedal_config",
