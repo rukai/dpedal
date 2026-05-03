@@ -15,23 +15,24 @@ profiles {
     // Standard profile
     - {
         mappings {
-          - dpad-up -> mouse-scroll-up
-          - dpad-down -> mouse-scroll-down
-          - dpad-left -> mouse-scroll-left
-          - dpad-right -> mouse-scroll-right
-          - button-left -> keyboard-page-up
-          - button-right -> keyboard-page-down
+          - on-press : dpad-up -> mouse-scroll-up 20
+          - on-press : dpad-down -> mouse-scroll-down 20
+          - on-press : dpad-left -> mouse-scroll-left 20
+          - on-press : dpad-right -> mouse-scroll-right 20
+          - on-press : button-left -> keyboard-page-up
+          - on-press : button-right -> keyboard-page-down
         }
     }
     // Alternate profile
     // - {
-    //     dpad-up mouse-scroll-up
-    //     dpad-down mouse-scroll-down
-    //     dpad-left mouse-scroll-left
-    //     dpad-right mouse-scroll-right
-
-    //     button-left keyboard-page-up
-    //     button-right keyboard-page-down
+    //     mappings {
+    //       - on-press : dpad-up -> mouse-scroll-up 20
+    //       - on-press : dpad-down -> mouse-scroll-down 20
+    //       - on-press : dpad-left -> mouse-scroll-left 20
+    //       - on-press : dpad-right -> mouse-scroll-right 20
+    //       - on-press : button-left -> keyboard-page-up
+    //       - on-press : button-right -> keyboard-page-down
+    //     }
     // }
 }
 
