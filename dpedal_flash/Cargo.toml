@@ -26,3 +26,6 @@ futures = { version = "0.3", features = ["executor"] }
 # TODO: lets just eradicate this unmaintained thing from the dep tree entirely
 ssmarshal = { version = "1", features = ["std"]}
 clap = { version = "4.5.53", features = ["derive"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"

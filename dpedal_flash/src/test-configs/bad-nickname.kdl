@@ -1,0 +1,12 @@
+version 0
+device dpedal-v3
+nickname 5
+color 0xFF0000
+profiles {
+    - {
+        mappings {
+        }
+    }
+}
+
+pin-remappings { }

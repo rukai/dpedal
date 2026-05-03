@@ -1,0 +1,33 @@
+version 0
+device dpedal-v3
+nickname "My DPedal"
+color 0xFF0000
+profiles {
+    - {
+        mappings {
+          - "dpad-up -> mouse-scroll-up"
+          - "dpad-down -> mouse-scroll-down"
+          - "dpad-left -> mouse-scroll-left"
+          - "dpad-right -> mouse-scroll-right"
+          - "button-left -> keyboard-page-up"
+          - "button-right -> keyboard-page-down"
+
+          // TODO:
+          // - button-left+button_right+dpad_down -> enter-flash-mode
+          // - button-left+button_right -> go-to-profile 2
+          // and allow:
+          // - dpad-right -> mouse-scroll-right 5 + sleep 5s + mouse-scroll-right 5
+        }
+    }
+}
+
+pin-remappings {
+    - {
+        input button-left
+        pin 3
+    }
+    - {
+        input button-right
+        pin 20
+    }
+ }
