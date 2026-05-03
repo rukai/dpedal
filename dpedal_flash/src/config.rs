@@ -312,7 +312,8 @@ mod test {
     use std::path::PathBuf;
 
     use dpedal_config::{
-        ComputerInput, Config, DpedalInput, KeyboardInput, MappingMode, Meta, MouseInput,
+        ComputerInput, Config, DPedalControl, DpedalInput, KeyboardInput, MappingMode, Meta,
+        MouseInput,
     };
     use dpedal_config::{Device, Mapping, PinRemapping, Profile};
     use miette::{GraphicalReportHandler, GraphicalTheme};
@@ -418,6 +419,17 @@ Error:
                             output_sequence: heapless::Vec::from_iter([ComputerInput::Keyboard(
                                 KeyboardInput::PageDown,
                             )]),
+                        },
+                        Mapping {
+                            input_set: heapless::Vec::from_iter([
+                                DpedalInput::ButtonLeft,
+                                DpedalInput::ButtonRight
+                            ]),
+                            mode: MappingMode::OnHold { hold_ms: 50 },
+                            output_sequence: heapless::Vec::from_iter([
+                                ComputerInput::Control(DPedalControl::AfterMillisHold(50)),
+                                ComputerInput::Control(DPedalControl::SetProfile(2))
+                            ]),
                         },
                     ]),
                 }]),

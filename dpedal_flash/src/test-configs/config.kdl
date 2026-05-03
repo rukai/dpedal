@@ -5,18 +5,14 @@ color 0xFF0000
 profiles {
     - {
         mappings {
-          - dpad-up -> mouse-scroll-up
-          - dpad-down -> mouse-scroll-down
-          - dpad-left -> mouse-scroll-left
-          - dpad-right -> mouse-scroll-right
-          - button-left -> keyboard-page-up
-          - button-right -> keyboard-page-down
+          - on-press : dpad-up -> mouse-scroll-up 20
+          - on-press : dpad-down -> mouse-scroll-down 20
+          - on-press : dpad-left -> mouse-scroll-left 20
+          - on-press : dpad-right -> mouse-scroll-right 20
+          - on-press : button-left -> keyboard-page-up
+          - on-press : button-right -> keyboard-page-down
 
-          // TODO:
-          // - button-left+button_right+dpad_down -> enter-flash-mode
-          // - button-left+button_right -> go-to-profile 2
-          // and allow:
-          // - dpad-right -> mouse-scroll-right 5 + sleep 5s + mouse-scroll-right 5
+          - on-hold 50 : button-left + button-right -> after-millis-hold 50 + set-profile 2
         }
     }
 }
