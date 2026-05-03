@@ -15,12 +15,12 @@ profiles {
     // Standard profile
     - {
         mappings {
-          - "dpad-up -> mouse-scroll-up"
-          - "dpad-down -> mouse-scroll-down"
-          - "dpad-left -> mouse-scroll-left"
-          - "dpad-right -> mouse-scroll-right"
-          - "button-left -> keyboard-page-up"
-          - "button-right -> keyboard-page-down"
+          - dpad-up -> mouse-scroll-up
+          - dpad-down -> mouse-scroll-down
+          - dpad-left -> mouse-scroll-left
+          - dpad-right -> mouse-scroll-right
+          - button-left -> keyboard-page-up
+          - button-right -> keyboard-page-down
         }
     }
     // Alternate profile
