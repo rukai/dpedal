@@ -26,7 +26,7 @@ source-tarball = false
 
 [[dist.extra-artifacts]]
 artifacts = ["dpedal_gerber_files.zip"]
-build = ["bash", "-c", "./install_kicad_ubuntu.sh; ./export_pcb.sh"]
+build = ["bash", "-c", "./export_pcb.sh"]
 
 [[dist.extra-artifacts]]
 artifacts = ["dpedal_firmware.uf2"]

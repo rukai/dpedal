@@ -1,0 +1,28 @@
+name: Test Kicad Export
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# Cancel already running jobs
+concurrency:
+  group: pcb_${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: kicad
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: kicad build
+      run: ./export_pcb.sh
+    - name: Ensure that tests did not create or modify any files that arent .gitignore'd
+      shell: bash
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          git status
+          exit 1
+        fi
