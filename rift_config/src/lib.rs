@@ -107,7 +107,7 @@ pub struct PinRemapping<InputT> {
 
 pub const MAX_MAPPINGS: usize = 12;
 pub const MAX_COMPUTER_INPUTS: usize = 25;
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct Profile<InputT> {
     pub mappings: Vec<Mapping<InputT>, MAX_MAPPINGS>,
 }

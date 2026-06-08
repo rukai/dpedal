@@ -1,8 +1,4 @@
 use defmt::error;
-use rift_config::{
-    CONFIG_FLASH_RANGE, ConfigKey, MAX_PROFILES, META_SERIALIZED_SIZE, PICO_FLASH_SIZE,
-    PROFILE_SERIALIZED_SIZE, 
-};
 use embassy_rp::{
     Peri,
     dma::Channel,
@@ -11,10 +7,15 @@ use embassy_rp::{
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, watch::Watch};
 use heapless::Vec;
+use rift_config::{
+    CONFIG_FLASH_RANGE, ConfigKey, MAX_PROFILES, META_SERIALIZED_SIZE, PICO_FLASH_SIZE,
+    PROFILE_SERIALIZED_SIZE,
+};
 use sequential_storage::{
     cache::NoCache,
     map::{MapConfig, MapStorage},
 };
+use serde::de::DeserializeOwned;
 use static_cell::StaticCell;
 
 pub static CONFIG_UPDATED: Watch<CriticalSectionRawMutex, (), 2> = Watch::new();
@@ -65,6 +66,16 @@ impl ConfigFlash {
         }
     }
 
+    pub async fn load_meta<MetaT>(&mut self) -> MetaT
+    where
+        MetaT: DeserializeOwned + Default,
+    {
+        match self.load_meta_bytes().await {
+            Ok(bytes) => postcard::from_bytes::<MetaT>(&bytes).unwrap_or_default(),
+            Err(()) => MetaT::default(),
+        }
+    }
+
     pub async fn load_profile_bytes(
         &mut self,
         index: u8,
@@ -84,6 +95,16 @@ impl ConfigFlash {
         }
     }
 
+    pub async fn load_profile<ProfileT>(&mut self, index: u8) -> ProfileT
+    where
+        ProfileT: DeserializeOwned + Default,
+    {
+        match self.load_profile_bytes(index).await {
+            Ok(bytes) => postcard::from_bytes::<ProfileT>(&bytes).unwrap_or_default(),
+            Err(()) => ProfileT::default(),
+        }
+    }
+
     pub async fn get_profile_count(&mut self) -> u8 {
         let key = ConfigKey::ProfileCount.key();
         let result = self
@@ -100,6 +121,7 @@ impl ConfigFlash {
     /// Store new meta bytes. As a side effect, resets ProfileCount to 0
     /// (old Profile entries remain in flash but become unreachable until new profiles are added).
     pub async fn store_meta(&mut self, bytes: &[u8]) -> Result<(), ()> {
+        // TODO: restore with generics
         //postcard::from_bytes::<Meta>(bytes).map_err(|_| ())?;
 
         self.storage
@@ -123,6 +145,7 @@ impl ConfigFlash {
 
     /// Append a new profile at the current profile count index, then increment the count.
     pub async fn add_profile(&mut self, bytes: &[u8]) -> Result<(), ()> {
+        // TODO
         //postcard::from_bytes::<Profile>(bytes).map_err(|_| ())?;
 
         let count = self.get_profile_count().await;

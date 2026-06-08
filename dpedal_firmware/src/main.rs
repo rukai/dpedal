@@ -13,20 +13,14 @@
 //! memory.x is setup to assert that the linker has allocated at least 64KB of stack.
 //! Currently, the firmware works fine, but long term we should move anything >= 1024 bytes off of the stack to avoid stack overflow issues.
 
-mod config;
 mod input;
-mod keyboard;
-mod mapping_state;
-mod mouse;
-mod usb;
-mod web_config;
 
-use crate::config::ConfigFlash;
 use crate::input::Inputs;
-use crate::keyboard::Keyboard;
-use crate::mouse::Mouse;
-use crate::web_config::WebConfig;
 use embassy_executor::Spawner;
+use rift_firmware::config::ConfigFlash;
+use rift_firmware::keyboard::Keyboard;
+use rift_firmware::mouse::Mouse;
+use rift_firmware::web_config::WebConfig;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -36,7 +30,8 @@ async fn main(_spawner: Spawner) {
 
     let config_flash = ConfigFlash::new(p.FLASH, p.DMA_CH0).await;
 
-    let mut builder = usb::usb_builder(p.USB, config_flash).await;
+    // TODO: restore custom naming
+    let mut builder = rift_firmware::usb::usb_builder(p.USB, "DPedal").await;
 
     let mut web_config = WebConfig::new(&mut builder, config_flash);
 

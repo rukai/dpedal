@@ -1,5 +1,4 @@
 use defmt::*;
-use rift_config::MouseInput;
 use embassy_futures::join::join;
 use embassy_rp::{peripherals::USB, usb::Driver};
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel};
@@ -7,6 +6,7 @@ use embassy_usb::{
     Builder,
     class::hid::{HidBootProtocol, HidReader, HidReaderWriter, HidSubclass, HidWriter, State},
 };
+use rift_config::MouseInput;
 use static_cell::StaticCell;
 use usbd_hid::descriptor::{MouseReport, SerializedDescriptor};
 

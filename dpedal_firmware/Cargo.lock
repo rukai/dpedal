@@ -377,6 +377,8 @@ dependencies = [
  "panic-probe",
  "portable-atomic",
  "postcard",
+ "rift_config",
+ "rift_firmware",
  "sequential-storage",
  "static_cell",
  "usbd-hid",
@@ -1233,6 +1235,42 @@ name = "rgb"
 version = "0.8.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4"
+
+[[package]]
+name = "rift_config"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+ "heapless 0.8.0",
+ "serde",
+ "strum",
+ "usbd-hid",
+]
+
+[[package]]
+name = "rift_firmware"
+version = "0.1.0"
+dependencies = [
+ "cortex-m",
+ "cortex-m-rt",
+ "defmt",
+ "defmt-rtt",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-rp",
+ "embassy-sync",
+ "embassy-time",
+ "embassy-usb",
+ "heapless 0.8.0",
+ "panic-probe",
+ "portable-atomic",
+ "postcard",
+ "rift_config",
+ "sequential-storage",
+ "serde",
+ "static_cell",
+ "usbd-hid",
+]
 
 [[package]]
 name = "rp-pac"

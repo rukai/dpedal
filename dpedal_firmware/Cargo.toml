@@ -31,10 +31,13 @@ embassy-sync = { git = "https://github.com/embassy-rs/embassy", rev = "3214021ed
 usbd-hid = "0.9.0"
 portable-atomic = { version = "1.11.0", features = ["critical-section"] }
 static_cell = "2.1.1"
-dpedal_config = { path = "../dpedal_config"}
 postcard = "1.1.3"
 heapless = { version = "0.8", default-features = false, features = ["serde"] }
 sequential-storage = "7"
+
+dpedal_config = { path = "../dpedal_config"}
+rift_firmware = { path = "../rift_firmware"}
+rift_config = { path = "../rift_config"}
 
 [profile.release]
 codegen-units = 1

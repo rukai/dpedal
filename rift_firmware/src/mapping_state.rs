@@ -1,15 +1,38 @@
 use crate::keyboard::{KEYBOARD_CHANNEL, KeyboardEvent};
 use crate::mouse::{MOUSE_CHANNEL, MouseEvent};
+use core::marker::PhantomData;
 use core::ops::ControlFlow;
-use dpedal_config::{ComputerInput, DPedalControl, Mapping, MappingMode};
 use embassy_time::Instant;
+use heapless::Vec;
+use rift_config::{ComputerInput, DPedalControl, MAX_MAPPINGS, Mapping, MappingMode};
 
-use crate::input::State;
+pub struct State<InputT> {
+    /// The index of the currently selected profile
+    pub current_profile: u8,
+    /// Tracks press/release state for each mapping in the current profile
+    pub mapping_states: Vec<MappingState<InputT>, MAX_MAPPINGS>,
+}
+
+impl<InputT> State<InputT> {
+    pub fn new() -> State<InputT> {
+        State {
+            current_profile: 0,
+            mapping_states: Vec::new(),
+        }
+    }
+}
+
+impl<InputT> Default for State<InputT> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Clone, Copy)]
-pub struct MappingState {
+pub struct MappingState<InputT> {
     phase: MappingPhase,
     output: Option<RunningOutputSequence>,
+    _ty: PhantomData<InputT>,
 }
 
 #[derive(Clone, Copy)]
@@ -23,11 +46,12 @@ struct RunningOutputSequence {
     waiting_since: Instant,
 }
 
-impl MappingState {
-    pub fn new() -> Self {
+impl<InputT> MappingState<InputT> {
+    pub fn new() -> MappingState<InputT> {
         MappingState {
             phase: MappingPhase::Initial,
             output: None,
+            _ty: PhantomData,
         }
     }
 
@@ -36,10 +60,10 @@ impl MappingState {
     /// ControlFlow::Break indicates that all mapping states are now invalid and need to be recreated.
     pub async fn process(
         mut self,
-        mapping: &Mapping,
+        mapping: &Mapping<InputT>,
         all_pressed: bool,
-        state: &mut State,
-    ) -> ControlFlow<(), MappingState> {
+        state: &mut State<InputT>,
+    ) -> ControlFlow<(), MappingState<InputT>> {
         // progress the phase state machine
         self.process_phase(mapping, all_pressed).await;
 
@@ -49,7 +73,7 @@ impl MappingState {
         ControlFlow::Continue(self)
     }
 
-    async fn process_phase(&mut self, mapping: &Mapping, all_pressed: bool) {
+    async fn process_phase(&mut self, mapping: &Mapping<InputT>, all_pressed: bool) {
         self.phase = match mapping.mode {
             MappingMode::OnPress => match (self.phase, all_pressed) {
                 (MappingPhase::Initial, false) => MappingPhase::Released,
@@ -207,8 +231,8 @@ impl MappingState {
     /// Process the output sequence in chunks terminated by DPedalControl::AfterMillis*
     async fn process_output_sequence(
         &mut self,
-        mapping: &Mapping,
-        state: &mut State,
+        mapping: &Mapping<InputT>,
+        state: &mut State<InputT>,
     ) -> ControlFlow<()> {
         if let Some(output) = self.output.as_mut() {
             while (output.output_index as usize) < mapping.output_sequence.len() {
@@ -298,13 +322,13 @@ impl MappingState {
 
     /// Send release events for all unreleased inputs.
     /// Also the output_sequence is terminated, so any remaining elements in the sequence are skipped
-    async fn stop_outputs(&mut self, mapping: &Mapping) {
+    async fn stop_outputs(&mut self, mapping: &Mapping<InputT>) {
         if let Some(mut output) = self.output.take() {
             MappingState::release_held(&mut output, mapping).await;
         }
     }
 
-    async fn release_held(output: &mut RunningOutputSequence, mapping: &Mapping) {
+    async fn release_held(output: &mut RunningOutputSequence, mapping: &Mapping<InputT>) {
         let start = output.held_from as usize;
         let end = (output.output_index as usize).min(mapping.output_sequence.len());
         for output in &mapping.output_sequence[start..end] {
@@ -318,6 +342,12 @@ impl MappingState {
                 ComputerInput::Control(_) => {}
             }
         }
+    }
+}
+
+impl<InputT> Default for MappingState<InputT> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
