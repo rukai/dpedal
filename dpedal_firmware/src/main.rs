@@ -16,11 +16,16 @@
 mod input;
 
 use crate::input::Inputs;
+use dpedal_config::Meta;
 use embassy_executor::Spawner;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
+use heapless::String;
+use rift_config::MAX_NICKNAME_LEN;
 use rift_firmware::config::ConfigFlash;
 use rift_firmware::keyboard::Keyboard;
 use rift_firmware::mouse::Mouse;
 use rift_firmware::web_config::WebConfig;
+use static_cell::StaticCell;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -30,8 +35,8 @@ async fn main(_spawner: Spawner) {
 
     let config_flash = ConfigFlash::new(p.FLASH, p.DMA_CH0).await;
 
-    // TODO: restore custom naming
-    let mut builder = rift_firmware::usb::usb_builder(p.USB, "DPedal").await;
+    let device_name = device_name(config_flash).await;
+    let mut builder = rift_firmware::usb::usb_builder(p.USB, device_name).await;
 
     let mut web_config = WebConfig::new(&mut builder, config_flash);
 
@@ -87,4 +92,22 @@ async fn main(_spawner: Spawner) {
         web_config.process(),
     )
     .await;
+}
+
+async fn device_name(
+    config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
+) -> &'static mut String<{ MAX_NICKNAME_LEN + 20 }> {
+    static PRODUCT_NAME: StaticCell<String<{ MAX_NICKNAME_LEN + 20 }>> = StaticCell::new();
+    let product = PRODUCT_NAME.init(String::try_from("DPedal").unwrap());
+    let nickname = config_flash.lock().await.load_meta::<Meta>().await.nickname;
+    if !nickname.is_empty() {
+        product.push_str(" - ").unwrap();
+        product.push_str(&nickname).unwrap();
+    }
+    match env!("PROFILE") {
+        "release" => {}
+        _ => product.push_str(" (debug build)").unwrap(),
+    }
+
+    product
 }
