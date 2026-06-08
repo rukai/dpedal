@@ -3,10 +3,14 @@ members = [
     "dpedal_flash",
     "dpedal_config",
     "site",
+    "rift_flash",
+    "rift_config_web_app",
+    "rift_config",
 ]
 exclude = [
     "dpedal_firmware",
-    "dpedal_config_web_app"
+    "dpedal_config_web_app",
+    "rift_firmware"
 ]
 resolver = "2"
 

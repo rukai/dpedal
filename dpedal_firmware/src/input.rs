@@ -1,15 +1,15 @@
-use crate::config::{CONFIG_UPDATED, ConfigFlash};
-use crate::mapping_state::MappingState;
 use core::ops::ControlFlow;
-use dpedal_config::{DpedalInput, MAX_MAPPINGS, Profile};
+use dpedal_config::{DpedalInput, Meta};
 use embassy_rp::gpio::{AnyPin, Input, Pin, Pull};
 use embassy_rp::{Peri, PeripheralType};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::Timer;
-use heapless::Vec;
+use rift_config::Profile;
+use rift_firmware::config::{CONFIG_UPDATED, ConfigFlash};
+use rift_firmware::mapping_state::{MappingState, State};
 use static_cell::StaticCell;
 
-static CURRENT_PROFILE: StaticCell<Profile> = StaticCell::new();
+static CURRENT_PROFILE: StaticCell<Profile<DpedalInput>> = StaticCell::new();
 
 pub struct Inputs {
     pins: [Option<Peri<'static, AnyPin>>; 30],
@@ -35,7 +35,7 @@ impl Inputs {
         let mut dpad_right_pin = 22;
 
         // Load initial config
-        let meta = self.config_flash.lock().await.load_meta().await;
+        let meta: Meta = self.config_flash.lock().await.load_meta().await;
         let current_profile = {
             // TODO: currently handles config with 0 profiles by loading the default profile which has mappings in it.
             //       this is unintuitive and should be changed.
@@ -112,22 +112,6 @@ impl Inputs {
             }
 
             Timer::after_millis(1).await;
-        }
-    }
-}
-
-pub(crate) struct State {
-    /// The index of the currently selected profile
-    pub(crate) current_profile: u8,
-    /// Tracks press/release state for each mapping in the current profile
-    pub(crate) mapping_states: Vec<MappingState, MAX_MAPPINGS>,
-}
-
-impl State {
-    fn new() -> Self {
-        State {
-            current_profile: 0,
-            mapping_states: Vec::new(),
         }
     }
 }

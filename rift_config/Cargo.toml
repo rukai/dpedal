@@ -1,0 +1,11 @@
+[package]
+name = "rift_config"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+heapless.workspace = true
+usbd-hid = { version = "0.9.0", default-features = false }
+serde = { version = "1.0.0", default-features = false, features = ["derive"] }
+defmt = "1"
+strum = { version = "0.27.2", default-features = false, features = ["derive"] }

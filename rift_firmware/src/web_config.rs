@@ -1,6 +1,4 @@
 use defmt::*;
-use dpedal_config::COBS_ACCUMULATOR_SIZE;
-use dpedal_config::web_config_protocol::{Request, Response};
 use embassy_rp::usb::{Endpoint, In, Out};
 use embassy_rp::{peripherals::USB, usb::Driver};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
@@ -10,6 +8,8 @@ use embassy_usb::driver::{Endpoint as EndpointTrait, EndpointIn, EndpointOut};
 use embassy_usb::msos::{self, windows_version};
 use embassy_usb::types::InterfaceNumber;
 use postcard::accumulator::CobsAccumulator;
+use rift_config::COBS_ACCUMULATOR_SIZE;
+use rift_config::web_config_protocol::{Request, Response};
 use static_cell::StaticCell;
 
 use crate::config::{CONFIG_UPDATED, ConfigFlash};

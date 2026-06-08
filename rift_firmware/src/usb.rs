@@ -1,17 +1,14 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 use defmt::*;
-use dpedal_config::MAX_NICKNAME_LEN;
 use embassy_rp::peripherals::USB;
 use embassy_rp::usb::{Driver, InterruptHandler};
 use embassy_rp::{Peri, bind_interrupts};
 use embassy_usb::class::hid::{ReportId, RequestHandler};
 use embassy_usb::control::OutResponse;
 use embassy_usb::{Builder, Config, Handler};
-use heapless::String;
 use static_cell::StaticCell;
 
-use crate::config::ConfigFlash;
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
+pub const MAX_NICKNAME_LEN: usize = 50;
 
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
@@ -19,7 +16,7 @@ bind_interrupts!(struct Irqs {
 
 pub async fn usb_builder(
     usb: Peri<'static, USB>,
-    config_flash: &'static Mutex<CriticalSectionRawMutex, ConfigFlash>,
+    product: &'static str,
 ) -> Builder<'static, Driver<'static, USB>> {
     let driver = Driver::new(usb, Irqs);
 
@@ -30,20 +27,9 @@ pub async fn usb_builder(
     static BOS_DESC: StaticCell<[u8; 256]> = StaticCell::new();
     static MSOS_DESC: StaticCell<[u8; 1024]> = StaticCell::new();
     static CONTROL_BUF: StaticCell<[u8; 128]> = StaticCell::new();
-    static PRODUCT_NAME: StaticCell<String<{ MAX_NICKNAME_LEN + 20 }>> = StaticCell::new();
 
     let mut config = Config::new(0xc0de, 0xcafe);
     config.manufacturer = Some("Rukai");
-    let product = PRODUCT_NAME.init(String::try_from("DPedal").unwrap());
-    let nickname = config_flash.lock().await.load_meta().await.nickname;
-    if !nickname.is_empty() {
-        product.push_str(" - ").unwrap();
-        product.push_str(&nickname).unwrap();
-    }
-    match env!("PROFILE") {
-        "release" => {}
-        _ => product.push_str(" (debug build)").unwrap(),
-    }
     config.product = Some(product);
     config.serial_number = None;
     config.max_power = 100;
