@@ -10,5 +10,7 @@ cd dpedal_config_web_app
 cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings
 cd ../dpedal_firmware
 cargo hack --feature-powerset clippy --locked -- -D warnings
+cd ../rift_firmware
+cargo hack --feature-powerset clippy --locked -- -D warnings
 cd ..
 cargo hack --feature-powerset clippy --all-targets --locked -- -D warnings

@@ -1294,6 +1294,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "rift_config"
+version = "0.1.0"
+dependencies = [
+ "defmt",
+ "heapless 0.8.0",
+ "serde",
+ "strum",
+ "usbd-hid",
+]
+
+[[package]]
+name = "rift_config_web_app"
+version = "0.1.0"
+
+[[package]]
+name = "rift_flash"
+version = "0.1.0"
+
+[[package]]
 name = "rusb"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
